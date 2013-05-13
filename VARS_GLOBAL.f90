@@ -1,8 +1,60 @@
 !#####################################################################
 !     Program  : VARS_GLOBAL
-!     TYPE     : Module
 !     PURPOSE  : Defines the global variables used thru all the code
 !     AUTHORS  : Adriano Amaricci
+!#####################################################################
+! NAME
+! neqDMFT
+! DESCRIPTION
+!   Run the non-equilibrium DMFT in presence of an external electric field E. 
+!   The field is controlled by few flags in the nml/cmd options. It can be 
+!   constant, pulse or switched off smoothly. Many more fields can be added by  
+!   simply coding them in ELECTRIC_FIELD.f90. The executable read the file
+!   *inputFILE.ipt, if not found dump default values to a defualt file.
+!
+!   The output consist of very few data files that contain all the information,
+!   these are eventually read by a second program *get_data_neqDMFT to extract 
+!   all the relevant information.
+!   In this version the impurity solver is: IPT
+! OPTIONS (important)
+!  dt=[0.1]            -- Time step for solution of KB equations
+!  beta=[100.0]             -- Inverse temperature 
+!  U=[6]                    -- Hubbard local interaction value
+!  Efield=[0]               -- Strenght of the electric field
+!  Vbath=[0]                -- Strenght of the coupling to bath (Lambda=Vbath^2/Wbath)
+!  Wbath=[10.0]             -- Bandwidth of the fermionic thermostat
+!  ts=[1]                   -- Hopping parameter
+!  nstep=[50]               -- Number of time steps: T_max = dt*nstep
+!  nloop=[30]               -- Maximum number of DMFT loops allowed (then exit)
+!  eps_error=[1.d-4]        -- Tolerance on convergence
+!  weight=[0.9]             -- Mixing parameter
+!  Nsuccess =[2]            -- Number of consecutive success for convergence to be true
+!  Ex=[1]                   -- X-component of the Electric field vector
+!  Ey=[1]                   -- Y-component of the Electric field vector
+!  t0=[0]                   -- Switching on time parameter for the Electric field
+!  t1=[10^6]                -- Switching off time parameter for the Electric field
+!  Ncycles=[3]              -- Number of cycles in the  gaussian packect envelope for the impulsive field. fix width.
+!  omega0=[pi]            -- Frequency of the of the Oscillating Electric field        
+!  E1=[0]                   -- Strenght of the electric field for the AC+DC case, to be tuned to resonate
+!  field_type=[dc]       -- Type of electric field profile (dc,ac,ac+dc,etc..)
+!  bath_type=[flat]     -- Fermionic thermostat type (constant,gaussian,bethe,etc..)
+!  int_method=["trapz"]     -- 
+!  data_dir=[DATAneq]       -- Name of the directory containing data files
+!  plot_dir=[PLOT]          -- Name of the directory containing plot files
+!  fchi=[F]                 -- Flag for the calculation of the optical response
+!  L=[1024]                 -- A large number for whatever reason
+!  Ltau=[200]               -- A large number for whatever reason
+!  P=[5]                    -- Uniform Power mesh power-mesh parameter
+!  Q=[5]                    -- Uniform Power mesh uniform-mesh parameter
+!  eps=[0.05d0]             -- Broadening on the real-axis
+!  Nx=[50]                  -- Number of k-points along x-axis 
+!  Ny=[50]                  -- Number of k-points along y-axis 
+!  solve_wfftw =[F]         -- 
+!  plot3D=[F]       -- 
+!  Lkreduced=[200]  -- 
+!  eps=[0.05d0]         -- 
+!  irdSFILE=[restartSigma]-- 
+!  irdNkFILE=[restartNk]-- 
 !#####################################################################
 MODULE VARS_GLOBAL
   !Local:
@@ -17,6 +69,7 @@ MODULE VARS_GLOBAL
   USE INTEGRATE
   USE IOTOOLS
   USE FFTGF
+  USE FUNCTIONS
   USE SPLINE
   USE TOOLS
   USE MPI
@@ -79,8 +132,8 @@ MODULE VARS_GLOBAL
   real(8)                                :: Efield        !Electric field strength
   real(8)                                :: Ex,Ey         !Electric field vectors as input
   real(8)                                :: t0,t1         !turn on/off time, t0 also center of the pulse
-  real(8)                                :: w0,tau0       !parameters for pulsed light
-  real(8)                                :: omega0        !parameter for the Oscilatting field
+  integer                                :: Ncycles       !Number of cycles in pulsed light packet
+  real(8)                                :: omega0        !parameter for the Oscilatting field and Pulsed light
   real(8)                                :: E1            !Electric field strenght for the AC+DC case (tune to resonate)
 
   !EQUILIUBRIUM (and Wigner transformed) GREEN'S FUNCTION 
@@ -113,8 +166,7 @@ MODULE VARS_GLOBAL
   !SUSCEPTIBILITY ARRAYS (in KADANOFF-BAYM)
   !=========================================================  
   real(8),allocatable,dimension(:,:,:,:) :: chi
-  real(8),allocatable,dimension(:,:,:,:) :: chi_pm
-  real(8),allocatable,dimension(:,:,:)   :: chi_dia
+
 
 
   !DATA DIRECTORY:
@@ -150,8 +202,7 @@ MODULE VARS_GLOBAL
        Ey           ,& 
        t0           ,& 
        t1           ,& 
-       tau0         ,& 
-       w0           ,& 
+       Ncycles      ,& 
        omega0       ,& 
        E1           ,& 
                                 !K-GRID
@@ -189,67 +240,6 @@ contains
 
     call version(revision)
 
-    allocate(help_buffer(60))
-    help_buffer=([&
-         'NAME',&
-         '  neqDMFT',&
-         '',&
-         'DESCRIPTION',&
-         '  Run the non-equilibrium DMFT in presence of an external electric field E. ',&
-         '  The field is controlled by few flags in the nml/cmd options. It can be ',&
-         '  constant, pulse or switched off smoothly. Many more fields can be added by  ',&
-         '  simply coding them in ELECTRIC_FIELD.f90. The executable read the file',&
-         '  *inputFILE.ipt, if not found dump default values to a defualt file.',&
-         '  ',&
-         '  The output consist of very few data files that contain all the information,',&
-         '  these are eventually read by a second program *get_data_neqDMFT to extract ',&
-         '  all the relevant information.',&
-         ' ',&
-         '  In this version the impurity solver is: IPT',&
-         ' ',&
-         'OPTIONS (important)',&
-         ' dt=[0.157080]            -- Time step for solution of KB equations',&
-         ' beta=[100.0]             -- Inverse temperature ',&
-         ' U=[6]                    -- Hubbard local interaction value',&
-         ' Efield=[0]               -- Strenght of the electric field',&
-         ' Vbath=[0]                -- Strenght of the coupling to bath (Lambda=Vbath^2/Wbath)',&
-         ' Wbath=[10.0]             -- Bandwidth of the fermionic thermostat',&
-         ' ts=[1]                   -- Hopping parameter',&
-         ' nstep=[50]               -- Number of time steps: T_max = dt*nstep',&
-         ' nloop=[30]               -- Maximum number of DMFT loops allowed (then exit)',&
-         ' eps_error=[1.d-4]        -- Tolerance on convergence',&
-         ' weight=[0.9]             -- Mixing parameter',&
-         ' Nsuccess =[2]            -- Number of consecutive success for convergence to be true',&
-         ' Ex=[1]                   -- X-component of the Electric field vector',&
-         ' Ey=[1]                   -- Y-component of the Electric field vector',&
-         ' t0=[0]                   -- Switching on time parameter for the Electric field',&
-         ' t1=[10^6]                -- Switching off time parameter for the Electric field',&
-         ' tau0=[1]                 -- Width of gaussian packect envelope for the impulsive Electric field',&
-         ' w0=[20]                  -- Frequency of the of the impulsive Electric field',&
-         ' omega0=[pi/4]            -- Frequency of the of the Oscillating Electric field',&        
-         ' E1=[1]                   -- Strenght of the electric field for the AC+DC case, to be tuned to resonate',&
-         ' field_type=[dc]       -- Type of electric field profile (dc,ac,ac+dc,etc..)',&
-         ' bath_type=[flat]     -- Fermionic thermostat type (constant,gaussian,bethe,etc..)',&
-         ' int_method=["trapz"]     -- ',&
-         ' data_dir=[DATAneq]       -- Name of the directory containing data files',&
-         ' plot_dir=[PLOT]          -- Name of the directory containing plot files',&
-         ' fchi=[F]                 -- Flag for the calculation of the optical response',&
-         ' L=[1024]                 -- A large number for whatever reason',&
-         ' Ltau=[200]               -- A large number for whatever reason',&
-         ' P=[5]                    -- Uniform Power mesh power-mesh parameter',&
-         ' Q=[5]                    -- Uniform Power mesh uniform-mesh parameter',&
-         ' eps=[0.05d0]             -- Broadening on the real-axis',&
-         ' Nx=[50]                  -- Number of k-points along x-axis ',&
-         ' Ny=[50]                  -- Number of k-points along y-axis ',&
-         ' solve_wfftw =[F]         -- ',&
-         ' plot3D=[F]       -- ',&
-         ' Lkreduced=[200]  -- ',&
-         ' eps=[0.05d0]         -- ',&
-         ' irdSFILE=[restartSigma]-- ',&
-         ' irdNkFILE=[restartNk]-- ',&
-         '  '])
-    call parse_cmd_help(help_buffer)
-
     !GLOBAL
     dt           = 0.1d0
     beta         = 10.d0
@@ -276,9 +266,8 @@ contains
     Ey           = 0.d0
     t0           = 0.d0
     t1           = 1.d9
-    tau0         = 0.d0
-    w0           = 0.d0
-    omega0       = pi/4.d0
+    Ncycles      = 1
+    omega0       = 1.d0*pi
     E1           = 0.d0
     !K-GRID
     Nx           = 25
@@ -336,8 +325,7 @@ contains
     call parse_cmd_variable(Ey           ,"EY")
     call parse_cmd_variable(t0           ,"T0")
     call parse_cmd_variable(t1           ,"T1")
-    call parse_cmd_variable(tau0         ,"TAU0")
-    call parse_cmd_variable(w0           ,"W0")
+    call parse_cmd_variable(ncycles      ,"NCYCLES")
     call parse_cmd_variable(omega0       ,"OMEGA0")
     call parse_cmd_variable(E1           ,"E1")
     !CONVERGENCE:

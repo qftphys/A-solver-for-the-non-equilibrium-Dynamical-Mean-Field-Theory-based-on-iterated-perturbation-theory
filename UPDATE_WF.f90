@@ -34,7 +34,9 @@ contains
     G0_old=G0    
 
     call msg("Update WF")
-    include "update_G0_nonequilibrium.f90"
+    !include "update_G0_nonequilibrium.f90"
+    print*,"I am using EQUILIBRIUM WF UPDATE!"
+    call update_equilibrium_weiss_field
     G0%less = weight*G0%less + (1.d0-weight)*G0_old%less
     G0%gtr  = weight*G0%gtr  + (1.d0-weight)*G0_old%gtr
 
@@ -75,37 +77,37 @@ contains
 
 
 
-  ! subroutine update_equilibrium_weiss_field
-  !   integer :: M,i,j,k,itau,jtau,NN
-  !   real(8) :: R,deg
-  !   real(8) :: w,A,An
-  !   forall(i=0:nstep,j=0:nstep)
-  !      gf%ret%t(i-j) = heaviside(t(i-j))*(locG%gtr(i,j)-locG%less(i,j))
-  !      sf%ret%t(i-j) = heaviside(t(i-j))*(Sigma%gtr(i,j)-Sigma%less(i,j))
-  !   end forall
-  !   if(heaviside(0.d0)==1.d0)gf%ret%t(0)=gf%ret%t(0)/2.d0
-  !   if(heaviside(0.d0)==1.d0)sf%ret%t(0)=sf%ret%t(0)/2.d0
+  subroutine update_equilibrium_weiss_field
+    integer :: M,i,j,k,itau,jtau,NN
+    real(8) :: R,deg
+    real(8) :: w,A,An
+    forall(i=0:nstep,j=0:nstep)
+       gf%ret%t(i-j) = heaviside(t(i-j))*(locG%gtr(i,j)-locG%less(i,j))
+       sf%ret%t(i-j) = heaviside(t(i-j))*(Sigma%gtr(i,j)-Sigma%less(i,j))
+    end forall
+    if(heaviside(0.d0)==1.d0)gf%ret%t(0)=gf%ret%t(0)/2.d0
+    if(heaviside(0.d0)==1.d0)sf%ret%t(0)=sf%ret%t(0)/2.d0
 
-  !   call fftgf_rt2rw(gf%ret%t,gf%ret%w,nstep) ; gf%ret%w=gf%ret%w*dt ; call swap_fftrt2rw(gf%ret%w)
-  !   call fftgf_rt2rw(sf%ret%t,sf%ret%w,nstep) ; sf%ret%w=sf%ret%w*dt ; call swap_fftrt2rw(sf%ret%w)
-  !   gf0%ret%w  = one/(one/gf%ret%w + sf%ret%w)
-  !   gf0%less%w = less_component_w(gf0%ret%w,wr,beta)
-  !   gf0%gtr%w  = gtr_component_w(gf0%ret%w,wr,beta)
+    call fftgf_rt2rw(gf%ret%t,gf%ret%w,nstep) ; gf%ret%w=gf%ret%w*dt ; call swap_fftrt2rw(gf%ret%w)
+    call fftgf_rt2rw(sf%ret%t,sf%ret%w,nstep) ; sf%ret%w=sf%ret%w*dt ; call swap_fftrt2rw(sf%ret%w)
+    gf0%ret%w  = one/(one/gf%ret%w + sf%ret%w)
+    gf0%less%w = less_component_w(gf0%ret%w,wr,beta)
+    gf0%gtr%w  = gtr_component_w(gf0%ret%w,wr,beta)
 
-  !   call fftgf_rw2rt(gf0%less%w,gf0%less%t,nstep) ; gf0%less%t=exa*fmesh/pi2*gf0%less%t
-  !   call fftgf_rw2rt(gf0%gtr%w, gf0%gtr%t,nstep)  ; gf0%gtr%t =exa*fmesh/pi2*gf0%gtr%t
-  !   call fftgf_rw2rt(gf0%ret%w, gf0%ret%t,nstep)  ; gf0%ret%t =exa*fmesh/pi2*gf0%ret%t
-  !   forall(i=0:nstep,j=0:nstep)
-  !      G0%less(i,j)= gf0%less%t(i-j)
-  !      G0%gtr(i,j) = gf0%gtr%t(i-j)
-  !   end forall
-  !   ! !PLus this:
-  !   ! forall(i=0:nstep,j=0:nstep)
-  !   !    G0ret(i,j)=heaviside(t(i-j))*(G0gtr(i,j) - G0less(i,j))
-  !   !    gf0%ret%t(i-j)=G0ret(i,j)
-  !   ! end forall
-  !   ! call fftgf_rt2rw(gf0%ret%t,gf0%less%w,nstep) ; gf0%less%w=gf0%less%w*dt ; call swap_fftrt2rw(gf0%less%w)
-  ! end subroutine update_equilibrium_weiss_field
+    call fftgf_rw2rt(gf0%less%w,gf0%less%t,nstep) ; gf0%less%t=exa*fmesh/pi2*gf0%less%t
+    call fftgf_rw2rt(gf0%gtr%w, gf0%gtr%t,nstep)  ; gf0%gtr%t =exa*fmesh/pi2*gf0%gtr%t
+    call fftgf_rw2rt(gf0%ret%w, gf0%ret%t,nstep)  ; gf0%ret%t =exa*fmesh/pi2*gf0%ret%t
+    forall(i=0:nstep,j=0:nstep)
+       G0%less(i,j)= gf0%less%t(i-j)
+       G0%gtr(i,j) = gf0%gtr%t(i-j)
+    end forall
+    ! !PLus this:
+    ! forall(i=0:nstep,j=0:nstep)
+    !    G0ret(i,j)=heaviside(t(i-j))*(G0gtr(i,j) - G0less(i,j))
+    !    gf0%ret%t(i-j)=G0ret(i,j)
+    ! end forall
+    ! call fftgf_rt2rw(gf0%ret%t,gf0%less%w,nstep) ; gf0%less%w=gf0%less%w*dt ; call swap_fftrt2rw(gf0%less%w)
+  end subroutine update_equilibrium_weiss_field
 
 
 

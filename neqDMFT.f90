@@ -92,6 +92,7 @@ contains
     type(vect2D),dimension(0:nstep) :: Jloc                   !local Current 
     real(8),dimension(0:nstep)      :: test_func
     integer                         :: selector
+    real(8) :: err
     if(mpiID==0)then
        if(Efield/=0.d0)then
           Jloc=Vzero
@@ -105,9 +106,10 @@ contains
           enddo
           test_func(0:nstep)=modulo(Jloc(0:nstep))
        else
-          forall(i=0:nstep)test_func(i)=-xi*Sigma%less(i,i)!-xi*locG%less(i,i)
+          forall(i=0:nstep)test_func(i)=-xi*locG%less(i,i)
        endif
-       converged=check_convergence(test_func(0:nstep),eps_error,Nsuccess,nloop,id=0)
+       converged=check_convergence(test_func(0:nstep),eps_error,Nsuccess,nloop,oerr=err)
+       if(isnan(err))call error("Aborted convergence: error=NaN")
     endif
   end function convergence_check
 

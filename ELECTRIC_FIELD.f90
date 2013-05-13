@@ -49,7 +49,7 @@ contains
   pure function Afield(t,E)
     type(vect2D),intent(in) :: E
     real(8),intent(in)      :: t
-    real(8)                 :: ftime,tau1
+    real(8)                 :: ftime,tau0,tau1
     type(vect2D)            :: Afield
     complex(8)              :: zp,zm
 
@@ -67,11 +67,18 @@ contains
        ftime =-sin(Omega0*(t-t0))/Omega0
        Afield=E*(Efield*ftime - E1*t)       !A(t) = E0*F(t)*(e_x + e_y)
 
-    case("pulse")               !LIGHT PULSE (for Pump&Probe)
-       tau1=tau0/pi2
-       zp=cmplx(t-t0,tau1**2*w0,8)/(sqrt(2.d0)*tau1)
-       zm=cmplx(t-t0,-tau1**2*w0,8)/(sqrt(2.d0)*tau1)
-       ftime =-real(sqrt(pi/2.d0)/2.d0*tau1*exp(-(tau1*w0)**2/2.d0)*(zerf(zm)+zerf(zp)),8)
+    case("pulse")               !LIGHT PULSE (for Pump&Probe) 
+       !Signal function:
+       !cos(\Omega*(t-t0)-pi/2)Exp(-((t-t0)/tau0)**2)
+       !sin(\Omega*(t-t0))Exp(-((t-t0)/tau0)**2)
+       ! tau1=tau0/pi2
+       ! zp=cmplx(t-t0,tau1**2*w0,8)/(sqrt(2.d0)*tau1)
+       ! zm=cmplx(t-t0,-tau1**2*w0,8)/(sqrt(2.d0)*tau1)
+       ! ftime =-real(sqrt(pi/2.d0)/2.d0*tau1*exp(-(tau1*w0)**2/2.d0)*(zerf(zm)+zerf(zp)),8)
+       tau0 = Ncycles/Omega0
+       zp = cmplx((t-t0)/tau0 , tau0*Omega0*pi/2.d0)
+       zm = cmplx((t-t0)/tau0 ,-tau0*Omega0*pi/2.d0)
+       ftime = -dimag(sqrt(pi)*tau0/4.d0*exp(-0.25d0*(tau0*Omega0*pi)**2)*(zerf(zp)-zerf(zm)))
        Afield=E*Efield*ftime       !A(t) = E0*F(t)*(e_x + e_y)
 
     case("ramp")                !RAMP TO CONSTANT DC-FIELD:

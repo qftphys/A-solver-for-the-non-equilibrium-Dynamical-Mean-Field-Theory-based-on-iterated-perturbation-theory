@@ -89,7 +89,7 @@ contains
   !+-------------------------------------------------------------------+
   subroutine evaluate_print_observables(dir)
     character(len=*)                          :: dir
-    integer                                   :: i,ik,ix,iy,it,is,step
+    integer                                   :: i,ik,ix,iy,it,is,step,iw
     complex(8)                                :: I1,Ib
     real(8)                                   :: Wtot
     real(8),dimension(Nstep) :: intJ
@@ -107,7 +107,14 @@ contains
     integer,dimension(:),allocatable          :: reduced_ik             !reduced arrays
     real(8),dimension(:),allocatable          :: reduced_epsik
     real(8),dimension(:,:),allocatable        :: reduced_nk,reduced_npi,reduced_epi
-    real(8),dimension(2,2,0:nstep,0:nstep)    :: scond,sscond
+    real(8),dimension(2,2,0:nstep,0:nstep)    :: oc,redoc
+
+    !
+    real(8)                :: ome(nstep)
+    complex(8),allocatable :: ocw(:)
+    real(8)                :: oct(-nstep:nstep)
+    complex(8)             :: swcond(2,2,0:nstep,nstep)
+
 
     call msg("Print Out Results (may take a while)")
 
@@ -152,10 +159,10 @@ contains
           Jkvec(i,ix,iy)  = Jk
           Jloc(i)         = Jloc(i) +  wt(ik)*Jk !todo *2.d0 spin degeneracy
           Jheat(i)        = Jheat(i)+  wt(ik)*epi(i,ik)*Jk !todo *2.d0 spin degeneracy
-          if(i>0)Stot(i)  = Stot(i) -  wt(ik)*(nk(i,ik)*log(nk(i,ik))+(1.d0-nk(i,ik))*log(1.d0-nk(i,ik)))
+          !if(i>0)Stot(i)  = Stot(i) -  wt(ik)*(nk(i,ik)*log(nk(i,ik))+(1.d0-nk(i,ik))*log(1.d0-nk(i,ik)))
        enddo
     enddo
-    Stot(0)=0.d0
+    !Stot(0)=0.d0
 
     forall(i=0:nstep,ik=1:Lk)sorted_epi(i,ik) = epi(i,sorted_ik(ik))
     forall(ik=1:Lkreduced)reduced_epi(0:nstep,ik) = sorted_epi(0:nstep,reduced_ik(ik))
@@ -219,24 +226,44 @@ contains
     doble= 0.5d0*(2.d0*nt) - 0.25d0 ; if(U/=0)doble = Epot/U + 0.5d0*(2.d0*nt)- 0.25d0
 
     if(fchi)then
-       scond=0.d0
+       !Get the optical conductivity \sigma(t,t') from the susceptibility \Chi:
+       oc=0.d0
        do i=0,nstep
           do j=0,nstep
-             do ik=j,nstep
-                scond(1,1,i,j)=scond(1,1,i,j)+chi(1,1,i,ik)*dt
-                scond(1,2,i,j)=scond(1,2,i,j)+chi(1,2,i,ik)*dt
-                scond(2,1,i,j)=scond(2,1,i,j)+chi(2,1,i,ik)*dt
-                scond(2,2,i,j)=scond(2,2,i,j)+chi(2,2,i,ik)*dt
+             do it=j,nstep
+                oc(1,1,i,j)=oc(1,1,i,j)-chi(1,1,i,it)*dt
+                oc(1,2,i,j)=oc(1,2,i,j)-chi(1,2,i,it)*dt
+                oc(2,1,i,j)=oc(2,1,i,j)-chi(2,1,i,it)*dt
+                oc(2,2,i,j)=oc(2,2,i,j)-chi(2,2,i,it)*dt
              enddo
           enddo
        enddo
 
-       sscond=zero
-       do it=0,nstep
-          do is=0,it
-             sscond(:,:,it,it-is)=scond(:,:,it,is)
+       forall(i=0:nstep,j=0:nstep)oct(i-j) = oc(1,1,i,j)
+       call splot("OC_t.ipt",t(0:),oct(0:))
+
+       !Partial FT to \sigma(t,w)
+       ome = wr(nstep+1:2*nstep)
+       swcond=0.d0
+       do i=1,nstep
+          do it=0,nstep
+             do is=0,it
+                swcond(1,1,it,i)=swcond(1,1,it,i)+oc(1,1,it,it-is)*exp(-xi*ome(i)*t(is))*dt
+             enddo
           enddo
        enddo
+       do it=0,nstep
+          call splot("allOC_it_realw.ipt",ome,swcond(1,1,it,:),append=.true.)
+       end do
+
+       allocate(ocw(nstep))
+       ocw=zero
+       do iw=1,nstep
+          do it=0,nstep
+             ocw(iw)=ocw(iw) + oct(it)*exp(xi*ome(iw)*t(it))*fmesh
+          enddo
+       enddo
+       call splot("OC_realw.ipt",ome,ocw)
 
     endif
 
@@ -259,8 +286,8 @@ contains
     call splot(dir//"/EtotVStime.ipt",t(0:nstep),Etot(0:nstep),Etot(0:nstep)+Eb(0:nstep))
     call splot(dir//"/WtotVSefield.ipt",Efield,Wtot)
 
-    call msg("Print S(t)")
-    call splot(dir//"/StotVStime.ipt",t(0:nstep),Stot(0:nstep))
+    ! call msg("Print S(t)")
+    ! call splot(dir//"/StotVStime.ipt",t(0:nstep),Stot(0:nstep))
 
     call msg("Print d(t)")
     call splot(dir//"/doccVStime.ipt",t(0:nstep),doble(0:nstep))
@@ -268,21 +295,21 @@ contains
 
     !DISTRIBUTION:
     call msg("Print n(k,t)")
-    call splot("nVStimeVSepsk3D.ipt",t(0:nstep),reduced_epsik,reduced_nk(0:nstep,:))
+    call splot3d(dir//"/nVStimeVSepsk3D.ipt",t(0:nstep),reduced_epsik,reduced_nk(0:nstep,:))
     do i=0,nstep
-       call splot("nVSepi.ipt",reduced_epsik(:),reduced_npi(i,:),append=TT)
+       call splot(dir//"/nVSepi.ipt",reduced_epsik(:),reduced_npi(i,:),append=TT)
     enddo
 
     !Fermi Surface plot:
     call msg("Print FS(k,t)")
-    call splot("3dFSVSpiVSt",kgrid(0:Nx,0)%x,kgrid(0,0:Ny)%y,nDens(0:Nx,0:Ny,0:Nstep))
+    call splot3d(dir//"/3dFSVSpiVSt",kgrid(0:Nx,0)%x,kgrid(0,0:Ny)%y,nDens(0:Nx,0:Ny,0:Nstep))
 
     !Current Vector Field:
     !if(Efield/=0.d0 .AND. plotVF)call dplot_vector_field("vf_JfieldVSkVSt",kgrid(0:Nx,0)%x,kgrid(0,0:Ny)%y,Jkvec(0:nstep,:,:)%x,Jkvec(0:nstep,:,:)%y)
 
     if(fchi)then
-       call splot("sigma_cond.ipt",t(0:nstep),t(0:nstep),scond(1,1,0:nstep,0:nstep))
-       call splot("red_sigma_cond.ipt",t(0:nstep),t(0:nstep),sscond(1,1,0:nstep,0:nstep))
+       call splot3d(dir//"/OC.ipt",t(0:nstep),t(0:nstep),oc(1,1,0:nstep,0:nstep))
+       !call splot3d(dir//"/redOC.ipt",t(0:nstep),t(0:nstep),redoc(1,1,0:nstep,0:nstep))
     endif
 
     !Local functions:
@@ -295,10 +322,10 @@ contains
        call plot_keldysh_contour_gf(locG,t(0:),trim(plot_dir)//"/locG")
        call plot_keldysh_contour_gf(Sigma,t(0:),trim(plot_dir)//"/Sigma")
     endif
-    call system("rm -rf "//dir//"/3d* 2>/dev/null")
-    call system("rm -rf "//dir//"/*3D 2>/dev/null")
-    call system("rm -rf "//dir//"/gif_* 2>/dev/null")
-    call system("mv -vf  gif_* vf_* 3d* *3D* nVSepi.ipt *cond* "//dir//"/ 2>/dev/null")
+    ! call system("rm -rf "//dir//"/3d* 2>/dev/null")
+    ! call system("rm -rf "//dir//"/*3D 2>/dev/null")
+    ! call system("rm -rf "//dir//"/gif_* 2>/dev/null")
+    ! call system("mv -vf  gif_* vf_* 3d* *3D* nVSepi.ipt *cond* "//dir//"/ 2>/dev/null")
     return
   end subroutine evaluate_print_observables
   !+-------------------------------------------------------------------+
@@ -353,23 +380,23 @@ contains
 
     !Obtain && plot Real frequency Functions:
     !===========================================================================
-    call fftgf_rt2rw(gf0%ret%t,gf0%ret%t,nstep) ;    gf0%ret%t=gf0%ret%t*dt ; call swap_fftrt2rw(gf0%ret%t)
-    call fftgf_rt2rw(gf%ret%t,gf%ret%t,nstep)   ;    gf%ret%t=gf%ret%t*dt   ; call swap_fftrt2rw(gf%ret%t)
-    call fftgf_rt2rw(sf%ret%t,sf%ret%t,nstep)   ;    sf%ret%t=dt*sf%ret%t   ; call swap_fftrt2rw(sf%ret%t)
+    call fftgf_rt2rw(gf0%ret%t,gf0%ret%w,nstep) ;    gf0%ret%w=gf0%ret%w*dt ; call swap_fftrt2rw(gf0%ret%w)
+    call fftgf_rt2rw(gf%ret%t,gf%ret%w,nstep)   ;    gf%ret%w=gf%ret%w*dt   ; call swap_fftrt2rw(gf%ret%w)
+    call fftgf_rt2rw(sf%ret%t,sf%ret%w,nstep)   ;    sf%ret%w=dt*sf%ret%w   ; call swap_fftrt2rw(sf%ret%w)
     ! if(loop==1)then
     !    call splot(dir//"/guessG0ret_realw.ipt",wr,gf0%ret%t)
     ! else
-    call splot(dir//"/G0ret_realw.ipt",wr,gf0%ret%t)
+    call splot(dir//"/G0ret_realw.ipt",wr,gf0%ret%w)
     ! endif
-    call splot(dir//"/Sret_realw.ipt",wr,sf%ret%t)
-    call splot(dir//"/DOS.ipt",wr,-aimag(gf%ret%t)/pi)
+    call splot(dir//"/Sret_realw.ipt",wr,sf%ret%w)
+    call splot(dir//"/DOS.ipt",wr,-aimag(gf%ret%w)/pi)
 
     forall(i=0:nstep,j=0:nstep)gtkel(i-j) = locG%less(i,j)+locG%gtr(i,j)
     call fftgf_rt2rw(gtkel,gfkel,nstep) ; gfkel=gfkel*dt ; call swap_fftrt2rw(gfkel)
     call splot(dir//"/locGkel_realw.ipt",wr,gfkel)
     phi = xi*gfkel/aimag(gf%ret%w)/2.d0
     do i=1,2*nstep
-       if(wr(i)>-1.d0)exit
+       if(wr(i)>-4.d0)exit
     enddo
     call splot(dir//"/phi_realw.ipt",wr(i:(2*nstep-i)),phi(i:(2*nstep-i)))
     return
@@ -409,10 +436,8 @@ contains
        nf_wgn(ia,:) = -xi*gfless_wgn(ia,:)/aimag(gfret_wgn(ia,:))
        call splot("n_wgnVSepi.ipt",wr(:),nf_wgn(ia,:),append=TT)
     enddo
-    call splot("wgndosVSrealwVStime.ipt",tave(0:nstep),wr(-nstep:nstep),-aimag(gfret_wgn(0:nstep,-nstep:nstep))/pi)
-    call splot("wgnnfVSrealwVStime.ipt",tave(0:nstep),wr(-nstep:nstep),nf_wgn(0:nstep,-nstep:nstep))
-    call system("mv *wgn*  WIGNER/")
-    !call plot_3D("wgnDOS3D","X","Y","Z",tave(0:nstep)/dt,wr(1:2*nstep),-aimag(gfret_wgn(0:nstep,1:2*nstep))/pi)
+    call splot3d("WIGNER/wgndosVSrealwVStime.ipt",tave(0:nstep),wr(-nstep:nstep),-aimag(gfret_wgn(0:nstep,-nstep:nstep))/pi)
+    call splot3d("WIGNER/wgnnfVSrealwVStime.ipt",tave(0:nstep),wr(-nstep:nstep),nf_wgn(0:nstep,-nstep:nstep))
 
   end subroutine plot_wigner_functions
   !+-------------------------------------------------------------------+
