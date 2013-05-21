@@ -9,7 +9,7 @@ module BATH
   USE VARS_GLOBAL
   implicit none
   private
-  integer,parameter                :: Lw=2048 !# of frequencies
+  integer,parameter                :: Lw=2000
   real(8),allocatable,dimension(:) :: bath_dens,wfreq
 
   public                           :: get_thermostat_bath

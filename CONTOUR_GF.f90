@@ -25,7 +25,7 @@ MODULE CONTOUR_GF
   public :: inquire_keldysh_contour_gf
 
   !##################################################################
-  ! KELDYSH-BAYM-MATSUBARS CONTOUR GREEN'S FUNCTIONS:
+  ! KELDYSH-BAYM-MATSUBARA CONTOUR GREEN'S FUNCTIONS:
   !##################################################################
   type :: kbm_contour_gf
      complex(8),dimension(:,:),pointer  :: less,gtr

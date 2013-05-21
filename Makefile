@@ -8,6 +8,7 @@ DIREXE= $(HOME)/.bin
 .SUFFIXES: .f90 
 OBJS =  CONTOUR_GF.o VARS_GLOBAL.o ELECTRIC_FIELD.o BATH.o EQUILIBRIUM.o IPT_NEQ.o UPDATE_WF.o KADANOFBAYM.o
 
+
 #=================STANDARD COMPILATION====================================
 all:FLAG=$(STD)
     ARGS=$(LIBDMFT) $(SFMODS) $(SFLIBS)
