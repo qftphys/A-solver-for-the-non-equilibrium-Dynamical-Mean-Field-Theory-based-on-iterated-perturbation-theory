@@ -34,9 +34,9 @@ contains
     G0_old=G0    
 
     call msg("Update WF")
-    !include "update_G0_nonequilibrium.f90"
-    print*,"I am using EQUILIBRIUM WF UPDATE!"
-    call update_equilibrium_weiss_field
+    include "update_G0_nonequilibrium.f90"
+    !print*,"I am using EQUILIBRIUM WF UPDATE!"
+    !call update_equilibrium_weiss_field
     G0%less = weight*G0%less + (1.d0-weight)*G0_old%less
     G0%gtr  = weight*G0%gtr  + (1.d0-weight)*G0_old%gtr
 

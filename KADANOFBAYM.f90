@@ -67,10 +67,12 @@ contains
     !Tmp array for MPI storage, set to zero
     call allocate_keldysh_contour_gf(tmpG,Nstep)
     allocate(tmpnk(0:nstep,Lk))
-    if(fchi)allocate(tmpchi(2,2,0:nstep,0:nstep))
     tmpG   = zero
     tmpnk  = 0.d0
-    tmpchi = 0.d0
+    if(fchi)then
+       allocate(tmpchi(2,2,0:nstep,0:nstep))
+       tmpchi = 0.d0
+    endif
 
     !=============START K-POINTS LOOP======================
     call start_timer
@@ -105,7 +107,7 @@ contains
          MPI_DOUBLE_COMPLEX,MPI_SUM,MPI_COMM_WORLD,MPIerr)
     call MPI_ALLREDUCE(tmpnk,nk,(nstep+1)*Lk,MPI_DOUBLE_PRECISION,&
          MPI_SUM,MPI_COMM_WORLD,MPIerr)
-    call MPI_ALLREDUCE(tmpchi,chi,2*2*(nstep+1)**2,MPI_DOUBLE_PRECISION,&
+    if(fchi)call MPI_ALLREDUCE(tmpchi,chi,2*2*(nstep+1)**2,MPI_DOUBLE_PRECISION,&
          MPI_SUM,MPI_COMM_WORLD,MPIerr)
 
     !Deallocate tmp arrays:
@@ -548,10 +550,10 @@ contains
     call MPI_BCAST(locG%less,(nstep+1)**2,MPI_DOUBLE_COMPLEX,0,MPI_COMM_WORLD,mpiERR)
     call MPI_BCAST(locG%gtr,(nstep+1)**2,MPI_DOUBLE_COMPLEX,0,MPI_COMM_WORLD,mpiERR)
     call MPI_BCAST(nk,(nstep+1)*Lk,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiERR)
-    call splot('nkVSepsk.ipt',epsik,nk(nstep/2,:),append=TT)
-    call splot('locSM_iw.ipt',wm,sigmaM,append=TT)
-    call splot("eqG_w.ipt",wr,gf%ret%w,append=TT)
-    call splot("eqSigma_w.ipt",wr,sf%ret%w,append=TT)
+    call splot('nkVSepsk.ipt',epsik,nk(nstep/2,:),append=.true.)
+    call splot('locSM_iw.ipt',wm,sigmaM,append=.true.)
+    call splot("eqG_w.ipt",wr,gf%ret%w,append=.true.)
+    call splot("eqSigma_w.ipt",wr,sf%ret%w,append=.true.)
     return
   end subroutine get_equilibrium_localgf
 
@@ -575,7 +577,7 @@ contains
     if(mpiID==0)then
 
        call write_keldysh_contour_gf(locG,trim(data_dir)//"/locG")
-       call splot(trim(data_dir)//"/nk.data",nk(0:,:))
+       call store_data(trim(data_dir)//"/nk.data",nk(0:,:))
 
        if(plot3D)then
           call plot_keldysh_contour_gf(locG,t(0:),trim(plot_dir)//"/locG")
@@ -588,17 +590,17 @@ contains
        end forall
        !if(heaviside(0.d0)==1.d0)gf%ret%t(0)=gf%ret%t(0)/2.d0
        call fftgf_rt2rw(gf%ret%t,gf%ret%w,nstep) ;  gf%ret%w=gf%ret%w*dt ; call swap_fftrt2rw(gf%ret%w)
-       call splot("locGless_t.ipt",t,gf%less%t,append=TT)
-       call splot("locGgtr_t.ipt",t,gf%gtr%t,append=TT)
-       call splot("locGret_t.ipt",t,gf%ret%t,append=TT)
-       call splot("locGret_realw.ipt",wr,gf%ret%w,append=TT)
-       call splot("locDOS.ipt",wr,-aimag(gf%ret%w)/pi,append=TT)
+       call splot("locGless_t.ipt",t,gf%less%t,append=.true.)
+       call splot("locGgtr_t.ipt",t,gf%gtr%t,append=.true.)
+       call splot("locGret_t.ipt",t,gf%ret%t,append=.true.)
+       call splot("locGret_realw.ipt",wr,gf%ret%w,append=.true.)
+       call splot("locDOS.ipt",wr,-aimag(gf%ret%w)/pi,append=.true.)
 
        if(fchi)then
-          call splot(trim(data_dir)//"/locChi_11.data",chi(1,1,0:,0:))
-          call splot(trim(data_dir)//"/locChi_12.data",chi(1,2,0:,0:))
-          call splot(trim(data_dir)//"/locChi_21.data",chi(2,1,0:,0:))
-          call splot(trim(data_dir)//"/locChi_22.data",chi(2,2,0:,0:))
+          call store_data(trim(data_dir)//"/locChi_11.data",chi(1,1,0:,0:))
+          call store_data(trim(data_dir)//"/locChi_12.data",chi(1,2,0:,0:))
+          call store_data(trim(data_dir)//"/locChi_21.data",chi(2,1,0:,0:))
+          call store_data(trim(data_dir)//"/locChi_22.data",chi(2,2,0:,0:))
           if(plot3D)then
              call splot3d(trim(plot_dir)//"/locChi_11",t(0:),t(0:),chi(1,1,0:,0:))
              call splot3d(trim(plot_dir)//"/locChi_12",t(0:),t(0:),chi(1,2,0:,0:))
@@ -618,12 +620,8 @@ contains
              Jloc(i) = Jloc(i) +  wt(ik)*Jk
           enddo
        enddo
-       call splot("nVStime.ipt",t(0:nstep),2.d0*nt(0:nstep),append=TT)
-       modJloc(0:nstep)=modulo(Jloc(0:nstep))
-       if(Efield/=0.d0)then
-          call splot("JlocVStime.ipt",t(0:nstep),Jloc(0:nstep)%x,Jloc(0:nstep)%y,append=TT)
-          call splot("modJlocVStime.ipt",t(0:nstep),modJloc(0:nstep),append=TT)
-       endif
+       call splot("nVStime.ipt",t(0:nstep),2.d0*nt(0:nstep),append=.true.)
+       if(Efield/=0.d0)call splot("JlocVStime.ipt",t(0:nstep),Jloc(0:nstep)%x,Jloc(0:nstep)%y,append=.true.)
 
     endif
   end subroutine print_out_Gloc

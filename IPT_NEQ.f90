@@ -91,7 +91,7 @@ contains
        call write_keldysh_contour_gf(Sigma,trim(data_dir)//"/Sigma")
        if(plot3D)call plot_keldysh_contour_gf(Sigma,t(0:),trim(plot_dir)//"/Sigma")
        forall(i=0:nstep)nt(i)=-xi*Sigma%less(i,i)
-       call splot("nsVStime.ipt",t(0:),nt(0:),append=TT)
+       call splot("nsVStime.ipt",t(0:),nt(0:),append=.true.)
     endif
   end subroutine neq_solve_ipt
 

@@ -64,7 +64,7 @@ contains
        converged=check_convergence(f0iw_,eps_error,Nsuccess,eqNloop)
        z=1.d0 - dimag(siw_(1))/wm_(1);z=1.d0/z
        call splot("Equilibrium/Matsubara/observables_all.ipt",&
-            dfloat(loop),beta,u,n,z,append=TT)
+            dfloat(loop),beta,u,n,z,append=.true.)
     enddo
     call close_file("Equilibrium/Matsubara/observables_all.ipt")
     call splot("Equilibrium/Matsubara/G_iw.ipt",wm_,fiw_)
@@ -111,7 +111,7 @@ contains
        call sopt
        sigma_= weight*sigma_ + (1.d0-weight)*sold
        converged=check_convergence(sigma_,eps_error,nsuccess,eqNloop)
-       call splot("Equilibrium/Real/nVSiloop.ipt",loop,n,append=TT)
+       call splot("Equilibrium/Real/nVSiloop.ipt",loop,n,append=.true.)
     enddo
     call close_file("Equilibrium/Real/nVSiloop.ipt")
     call splot("Equilibrium/Real/DOS.ipt",wr_,-aimag(fg_)/pi)

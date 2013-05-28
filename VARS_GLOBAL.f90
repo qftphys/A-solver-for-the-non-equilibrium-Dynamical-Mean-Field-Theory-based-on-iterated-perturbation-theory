@@ -60,6 +60,7 @@ MODULE VARS_GLOBAL
   !Local:
   USE CONTOUR_GF
   !SciFor library
+  USE SCIFOR_VERSION
   USE COMMON_VARS
   USE PARSE_CMD
   USE GREENFUNX
@@ -108,6 +109,7 @@ MODULE VARS_GLOBAL
   real(8)                                :: Wgap          !gap of the gapped bath
   logical                                :: plot3D,fchi
   logical                                :: solve_eq
+  integer                                :: fupdate !flag to decide WFupdate procedure
   !
 
   !FILES TO RESTART
@@ -217,6 +219,7 @@ MODULE VARS_GLOBAL
        solve_eq     ,& 
        plot3D       ,& 
        fchi         ,& 
+       fupdate      ,&
                                 !FILES&DIR:
        irdSFILE      ,& 
        irdNkFILE     ,& 
@@ -281,6 +284,7 @@ contains
     solve_eq     = .false. 
     plot3D       = .false.
     fchi         = .false.
+    fupdate      = 0
     !FILES&DIR:
     irdSFILE      = 'restartSigma'
     irdNkFILE      = 'restartNk'
@@ -340,6 +344,7 @@ contains
     call parse_cmd_variable(solve_eq     ,"SOLVE_EQ")
     call parse_cmd_variable(plot3D       ,"PLOT3D")
     call parse_cmd_variable(fchi         ,"FCHI")
+    call parse_cmd_variable(fupdate      ,"FUPDATE")
     !FILES&DIR:
     call parse_cmd_variable(irdSFILE      ,"IRDSFILE")
     call parse_cmd_variable(irdNkFILE     ,"IRDNKFILE")

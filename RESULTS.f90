@@ -297,7 +297,7 @@ contains
     call msg("Print n(k,t)")
     call splot3d(dir//"/nVStimeVSepsk3D.ipt",t(0:nstep),reduced_epsik,reduced_nk(0:nstep,:))
     do i=0,nstep
-       call splot(dir//"/nVSepi.ipt",reduced_epsik(:),reduced_npi(i,:),append=TT)
+       call splot(dir//"/nVSepi.ipt",reduced_epsik(:),reduced_npi(i,:),append=.true.)
     enddo
 
     !Fermi Surface plot:
@@ -347,10 +347,10 @@ contains
     end forall
     if(heaviside(0.d0)==1.d0)gf%ret%t(0)=gf%ret%t(0)/2.d0
     call fftgf_rt2rw(gf%ret%t,gf%ret%w,nstep) ;    gf%ret%w=gf%ret%w*dt ; call swap_fftrt2rw(gf%ret%w)
-    call splot(dir//"/locGless_t.ipt",t(-nstep:nstep),gf%less%t,append=TT)
-    call splot(dir//"/locGgtr_t.ipt",t(-nstep:nstep),gf%gtr%t,append=TT)
-    call splot(dir//"/locGret_t.ipt",t(-nstep:nstep),gf%ret%t,append=TT)
-    call splot(dir//"/locGret_realw.ipt",wr,gf%ret%w,append=TT)
+    call splot(dir//"/locGless_t.ipt",t(-nstep:nstep),gf%less%t,append=.true.)
+    call splot(dir//"/locGgtr_t.ipt",t(-nstep:nstep),gf%gtr%t,append=.true.)
+    call splot(dir//"/locGret_t.ipt",t(-nstep:nstep),gf%ret%t,append=.true.)
+    call splot(dir//"/locGret_realw.ipt",wr,gf%ret%w,append=.true.)
     call splot(dir//"/locDOS.ipt",wr,-aimag(gf%ret%w)/pi)
 
     forall(i=0:nstep,j=0:nstep)
@@ -429,12 +429,12 @@ contains
        call fftgf_rt2rw(wgnGret(:,ia),gfret_wgn(ia,:),nstep)  ;gfret_wgn(ia,:)=gfret_wgn(ia,:)*dt;call swap_fftrt2rw(gfret_wgn(ia,:))
        call fftgf_rt2rw(wgnGless(:,ia),gfless_wgn(ia,:),nstep);gfless_wgn(ia,:)=gfless_wgn(ia,:)*dt;call swap_fftrt2rw(gfless_wgn(ia,:))
        call fftgf_rt2rw(wgnSret(:,ia),sfret_wgn(ia,:),nstep)  ;sfret_wgn(ia,:)=sfret_wgn(ia,:)*dt;call swap_fftrt2rw(sfret_wgn(ia,:))
-       call splot("WIGNER/wgnDOS.ipt",wr,(-aimag(gfret_wgn(ia,:) - delta*dble(ia)*pi)/pi),append=TT)
-       call splot("WIGNER/wgnSigma_realw.ipt",wr,(sfret_wgn(ia,:) + delta*dble(ia)),append=TT)
-       call splot("WIGNER/wgnGless_realw.ipt",wr,(gfless_wgn(ia,:) + delta*dble(ia)),append=TT)
+       call splot("WIGNER/wgnDOS.ipt",wr,(-aimag(gfret_wgn(ia,:) - delta*dble(ia)*pi)/pi),append=.true.)
+       call splot("WIGNER/wgnSigma_realw.ipt",wr,(sfret_wgn(ia,:) + delta*dble(ia)),append=.true.)
+       call splot("WIGNER/wgnGless_realw.ipt",wr,(gfless_wgn(ia,:) + delta*dble(ia)),append=.true.)
        ! nf_wgn(ia,:) = -aimag(gfless_wgn(ia,:))!/aimag(gfret_wgn(ia,:))/pi2
        nf_wgn(ia,:) = -xi*gfless_wgn(ia,:)/aimag(gfret_wgn(ia,:))
-       call splot("n_wgnVSepi.ipt",wr(:),nf_wgn(ia,:),append=TT)
+       call splot("n_wgnVSepi.ipt",wr(:),nf_wgn(ia,:),append=.true.)
     enddo
     call splot3d("WIGNER/wgndosVSrealwVStime.ipt",tave(0:nstep),wr(-nstep:nstep),-aimag(gfret_wgn(0:nstep,-nstep:nstep))/pi)
     call splot3d("WIGNER/wgnnfVSrealwVStime.ipt",tave(0:nstep),wr(-nstep:nstep),nf_wgn(0:nstep,-nstep:nstep))

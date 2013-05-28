@@ -12,10 +12,9 @@ MODULE CONTOUR_GF
   !##################################################################
   type :: keldysh_contour_gf
      complex(8),dimension(:,:),pointer  :: less,gtr
-     logical                            :: status
-     integer                            :: N
+     logical                            :: status=.false.
+     integer                            :: N=0
   end type keldysh_contour_gf
-
   public :: keldysh_contour_gf
   public :: allocate_keldysh_contour_gf
   public :: deallocate_keldysh_contour_gf
@@ -23,6 +22,7 @@ MODULE CONTOUR_GF
   public :: read_keldysh_contour_gf
   public :: plot_keldysh_contour_gf
   public :: inquire_keldysh_contour_gf
+
 
   !##################################################################
   ! KELDYSH-BAYM-MATSUBARS CONTOUR GREEN'S FUNCTIONS:
@@ -34,8 +34,6 @@ MODULE CONTOUR_GF
      logical                            :: status=.false.
      integer                            :: N=0,L=0
   end type kbm_contour_gf
-
-
   public :: kbm_contour_gf
   public :: allocate_kbm_contour_gf
   public :: deallocate_kbm_contour_gf
@@ -43,6 +41,8 @@ MODULE CONTOUR_GF
   public :: inquire_kbm_contour_gf
   public :: read_kbm_contour_gf
   public :: plot_kbm_contour_gf
+
+
 
 
   interface operator(*)
@@ -68,27 +68,20 @@ contains
   !################################################################################
   !########### KELDYSH CONTOUR GREEN'S FUNCTION (REAL-TIME ONLY) ##################
   !################################################################################
-
   subroutine keldysh_contour_gf_equality(G1,G2)
     type(keldysh_contour_gf),intent(inout) :: G1
     type(keldysh_contour_gf),intent(in)    :: G2
     G1%less = G2%less
     G1%gtr = G2%gtr
   end subroutine keldysh_contour_gf_equality
-  !--------------------------------------------
 
-  !--------------------------------------------
+
   subroutine keldysh_contour_gf_equality_(G1,C)
     type(keldysh_contour_gf),intent(inout) :: G1
     complex(8),intent(in) :: C
     G1%less = C
     G1%gtr = C
   end subroutine keldysh_contour_gf_equality_
-
-
-  !******************************************************************
-  !******************************************************************
-  !******************************************************************
 
 
   subroutine allocate_keldysh_contour_gf(G,N)
@@ -103,11 +96,6 @@ contains
   end subroutine allocate_keldysh_contour_gf
 
 
-  !******************************************************************
-  !******************************************************************
-  !******************************************************************
-
-
   subroutine deallocate_keldysh_contour_gf(G)
     type(keldysh_contour_gf) :: G
     deallocate(G%less,G%gtr)
@@ -115,9 +103,6 @@ contains
     G%status=.false.
   end subroutine deallocate_keldysh_contour_gf
 
-  !******************************************************************
-  !******************************************************************
-  !******************************************************************
 
   subroutine write_keldysh_contour_gf(G,file)
     type(keldysh_contour_gf) :: G
@@ -126,13 +111,10 @@ contains
     N=G%N+1
     if( (size(G%less)/=N**2) .OR. (size(G%gtr)/=N**2) )&
          call error("ERROR contour_gf/write_keldysh_contour_gf: wrong dimensions")
-    call splot(trim(file)//"_less.data",G%less(0:,0:))
-    call splot(trim(file)//"_gtr.data",G%gtr(0:,0:))
+    call store_data(trim(file)//"_less.data",G%less(0:,0:))
+    call store_data(trim(file)//"_gtr.data",G%gtr(0:,0:))
   end subroutine write_keldysh_contour_gf
 
-  !******************************************************************
-  !******************************************************************
-  !******************************************************************
 
   subroutine read_keldysh_contour_gf(G,file)
     type(keldysh_contour_gf) :: G
@@ -141,13 +123,10 @@ contains
     N=G%N+1
     if( (size(G%less)/=N**2) .OR. (size(G%gtr)/=N**2) )&
          call error("ERROR contour_gf/write_keldysh_contour_gf: wrong dimensions")
-    call sread(trim(file)//"_less.data",G%less(0:,0:))
-    call sread(trim(file)//"_gtr.data",G%gtr(0:,0:))
+    call read_data(trim(file)//"_less.data",G%less(0:,0:))
+    call read_data(trim(file)//"_gtr.data",G%gtr(0:,0:))
   end subroutine read_keldysh_contour_gf
 
-  !******************************************************************
-  !******************************************************************
-  !******************************************************************
 
   function inquire_keldysh_contour_gf(file) result(check)
     logical          :: check,bool1,bool2
@@ -161,9 +140,6 @@ contains
     check=bool1.AND.bool2
   end function inquire_keldysh_contour_gf
 
-  !******************************************************************
-  !******************************************************************
-  !******************************************************************
 
   subroutine plot_keldysh_contour_gf(G,t,file)
     type(keldysh_contour_gf)  :: G
@@ -177,9 +153,6 @@ contains
     call splot3d(trim(file)//"_gtr_t_t",t(0:),t(0:),G%gtr(0:,0:))
   end subroutine plot_keldysh_contour_gf
 
-  !******************************************************************
-  !******************************************************************
-  !******************************************************************
 
   function keldysh_contour_gf_scalarL_d(C,G) result(F)
     real(8),intent(in) :: C
@@ -189,9 +162,6 @@ contains
     F%gtr(0:,0:) = C*G%gtr(0:,0:)
   end function keldysh_contour_gf_scalarL_d
 
-  !******************************************************************
-  !******************************************************************
-  !******************************************************************
 
   function keldysh_contour_gf_scalarL_c(C,G) result(F)
     complex(8),intent(in) :: C
@@ -201,9 +171,6 @@ contains
     F%gtr(0:,0:)=C*G%gtr(0:,0:)
   end function keldysh_contour_gf_scalarL_c
 
-  !******************************************************************
-  !******************************************************************
-  !******************************************************************
 
   function keldysh_contour_gf_scalarR_d(G,C) result(F)
     real(8),intent(in) :: C
@@ -213,9 +180,6 @@ contains
     F%gtr(0:,0:)=G%gtr(0:,0:)*C
   end function keldysh_contour_gf_scalarR_d
 
-  !******************************************************************
-  !******************************************************************
-  !******************************************************************
 
   function keldysh_contour_gf_scalarR_c(G,C) result(F)
     complex(8),intent(in) :: C
@@ -225,40 +189,10 @@ contains
     F%gtr(0:,0:)=G%gtr(0:,0:)*C
   end function keldysh_contour_gf_scalarR_c
 
-  !******************************************************************
-  !******************************************************************
-  !******************************************************************
-
-  !This a rough implementation: just a shortcut:
-  subroutine mpi_reduce_keldysh_contour_gf(tmpG,G)
-    type(keldysh_contour_gf) :: tmpG
-    type(keldysh_contour_gf) :: G
-    if( .not.g%status )call error("ERROR contour_gf/mpi_reduce_keldysh_contour_gf: object function not allocated.")
-    if( (G%N /= tmpG%N) )call error("ERROR contour_gf/mpi_reduce_keldysh_contour_gf: wrong dimensions.")
-    call MPI_REDUCE(tmpG%less(0:,0:),G%less(0:,0:),size(tmpG%less(0:,0:)),&
-         MPI_DOUBLE_COMPLEX,MPI_SUM,0,MPI_COMM_WORLD,MPIerr)
-    call MPI_REDUCE(tmpG%gtr(0:,0:),G%gtr(0:,0:),size(tmpG%gtr(0:,0:)),&
-         MPI_DOUBLE_COMPLEX,MPI_SUM,0,MPI_COMM_WORLD,MPIerr)
-    call MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
-  end subroutine mpi_reduce_keldysh_contour_gf
 
   !******************************************************************
   !******************************************************************
   !******************************************************************
-
-  subroutine mpi_bcast_keldysh_contour_gf(G)
-    type(keldysh_contour_gf),intent(inout) :: G
-    if( .not.g%status )call error("ERROR contour_gf/mpi_bcast_keldysh_contour_gf: object function not allocated.")    
-    call MPI_BCAST(G%less(0:,0:),size(G%less(0:,0:)),MPI_DOUBLE_COMPLEX,0,MPI_COMM_WORLD,MPIerr)
-    call MPI_BCAST(G%gtr(0:,0:),size(G%gtr(0:,0:)),MPI_DOUBLE_COMPLEX,0,MPI_COMM_WORLD,MPIerr)
-    call MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
-  end subroutine mpi_bcast_keldysh_contour_gf
-
-  !******************************************************************
-  !******************************************************************
-  !******************************************************************
-
-
 
 
 
@@ -279,9 +213,6 @@ contains
     G%status=.true.
   end subroutine allocate_kbm_contour_gf
 
-  !******************************************************************
-  !******************************************************************
-  !******************************************************************
 
   subroutine deallocate_kbm_contour_gf(G)
     type(kbm_contour_gf) :: G
@@ -291,9 +222,6 @@ contains
     G%status=.false.
   end subroutine deallocate_kbm_contour_gf
 
-  !******************************************************************
-  !******************************************************************
-  !******************************************************************
 
   subroutine write_kbm_contour_gf(G,file)
     type(kbm_contour_gf) :: G
@@ -306,16 +234,13 @@ contains
          call error("ERROR contour_gf/write_kbm_contour_gf: wrong dimensions 2")
     if( size(G%mats)/=L*L)&
          call error("ERROR contour_gf/write_kbm_contour_gf: wrong dimensions 3")
-    call splot(trim(file)//"_less.data",G%less(0:,0:))
-    call splot(trim(file)//"_gtr.data",G%gtr(0:,0:))
-    call splot(trim(file)//"_lmix.data",G%lmix(0:,0:))
-    call splot(trim(file)//"_gmix.data",G%gmix(0:,0:))
-    call splot(trim(file)//"_mats.data",G%mats(0:,0:))
+    call store_data(trim(file)//"_less.data",G%less(0:,0:))
+    call store_data(trim(file)//"_gtr.data",G%gtr(0:,0:))
+    call store_data(trim(file)//"_lmix.data",G%lmix(0:,0:))
+    call store_data(trim(file)//"_gmix.data",G%gmix(0:,0:))
+    call store_data(trim(file)//"_mats.data",G%mats(0:,0:))
   end subroutine write_kbm_contour_gf
 
-  !******************************************************************
-  !******************************************************************
-  !******************************************************************
 
   function inquire_kbm_contour_gf(file) result(check)
     integer          :: i
@@ -332,11 +257,6 @@ contains
   end function inquire_kbm_contour_gf
 
 
-  !******************************************************************
-  !******************************************************************
-  !******************************************************************
-
-
   subroutine read_kbm_contour_gf(G,file)
     type(kbm_contour_gf) :: G
     character(len=*)     :: file
@@ -348,16 +268,13 @@ contains
          call error("ERROR contour_gf/write_kbm_contour_gf: wrong dimensions 2")
     if( size(G%mats)/=L*L)&
          call error("ERROR contour_gf/write_kbm_contour_gf: wrong dimensions 3")
-    call sread(trim(file)//"_less.data",G%less(0:,0:))
-    call sread(trim(file)//"_gtr.data",G%gtr(0:,0:))
-    call sread(trim(file)//"_lmix.data",G%lmix(0:,0:))
-    call sread(trim(file)//"_gmix.data",G%gmix(0:,0:))
-    call sread(trim(file)//"_mats.data",G%mats(0:,0:))
+    call read_data(trim(file)//"_less.data",G%less(0:,0:))
+    call read_data(trim(file)//"_gtr.data",G%gtr(0:,0:))
+    call read_data(trim(file)//"_lmix.data",G%lmix(0:,0:))
+    call read_data(trim(file)//"_gmix.data",G%gmix(0:,0:))
+    call read_data(trim(file)//"_mats.data",G%mats(0:,0:))
   end subroutine read_kbm_contour_gf
 
-  !******************************************************************
-  !******************************************************************
-  !******************************************************************
 
   subroutine plot_kbm_contour_gf(G,t,tau,file)
     type(kbm_contour_gf)  :: G
@@ -378,9 +295,6 @@ contains
     call splot3d(trim(file)//"_mats_tau_tau",tau(0:),tau(0:),G%mats(0:,0:))
   end subroutine plot_kbm_contour_gf
 
-  !******************************************************************
-  !******************************************************************
-  !******************************************************************
 
   subroutine kbm_contour_gf_equality_(G1,C)
     type(kbm_contour_gf),intent(inout) :: G1
@@ -392,9 +306,6 @@ contains
     G1%mats(0:,0:) = C
   end subroutine kbm_contour_gf_equality_
 
-  !******************************************************************
-  !******************************************************************
-  !******************************************************************
 
   function kbm_contour_gf_scalarL_d(C,G) result(F)
     real(8),intent(in) :: C
@@ -407,9 +318,6 @@ contains
     F%mats(0:,0:)= C*G%mats(0:,0:)
   end function kbm_contour_gf_scalarL_d
 
-  !******************************************************************
-  !******************************************************************
-  !******************************************************************
 
   function kbm_contour_gf_scalarL_c(C,G) result(F)
     complex(8),intent(in) :: C
@@ -422,9 +330,6 @@ contains
     F%mats(0:,0:)=C*G%mats(0:,0:)
   end function kbm_contour_gf_scalarL_c
 
-  !******************************************************************
-  !******************************************************************
-  !******************************************************************
 
   function kbm_contour_gf_scalarR_d(G,C) result(F)
     real(8),intent(in) :: C
@@ -437,9 +342,6 @@ contains
     F%mats(0:,0:)=G%mats(0:,0:)*C
   end function kbm_contour_gf_scalarR_d
 
-  !******************************************************************
-  !******************************************************************
-  !******************************************************************
 
   function kbm_contour_gf_scalarR_c(G,C) result(F)
     complex(8),intent(in) :: C
@@ -455,44 +357,5 @@ contains
   !******************************************************************
   !******************************************************************
   !******************************************************************
-
-  !This a rough implementation: just a shortcut:
-  subroutine mpi_reduce_kbm_contour_gf(tmpG,G)
-    type(kbm_contour_gf) :: tmpG
-    type(kbm_contour_gf) :: G
-    if( .not.g%status )call error("ERROR contour_gf/mpi_reduce_kbm_contour_gf: object function not allocated.")
-    if( (G%N /= tmpG%N) .OR. (G%L /=tmpG%L) )call error("ERROR contour_gf/mpi_reduce_kbm_contour_gf: wrong dimensions.")
-    call MPI_REDUCE(tmpG%less(0:,0:),G%less(0:,0:),size(tmpG%less(0:,0:)),&
-         MPI_DOUBLE_COMPLEX,MPI_SUM,0,MPI_COMM_WORLD,MPIerr)
-    call MPI_REDUCE(tmpG%gtr(0:,0:),G%gtr(0:,0:),size(tmpG%gtr(0:,0:)),&
-         MPI_DOUBLE_COMPLEX,MPI_SUM,0,MPI_COMM_WORLD,MPIerr)
-    call MPI_REDUCE(tmpG%lmix(0:,0:),G%lmix(0:,0:),size(tmpG%lmix(0:,0:)),&
-         MPI_DOUBLE_COMPLEX,MPI_SUM,0,MPI_COMM_WORLD,MPIerr)
-    call MPI_REDUCE(tmpG%gmix(0:,0:),G%gmix(0:,0:),size(tmpG%gmix(0:,0:)),&
-         MPI_DOUBLE_COMPLEX,MPI_SUM,0,MPI_COMM_WORLD,MPIerr)
-    call MPI_REDUCE(tmpG%mats(0:,0:),G%mats(0:,0:),size(tmpG%mats(0:,0:)),&
-         MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,MPIerr)
-    call MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
-  end subroutine mpi_reduce_kbm_contour_gf
-
-  !******************************************************************
-  !******************************************************************
-  !******************************************************************
-
-  subroutine mpi_bcast_kbm_contour_gf(G)
-    type(kbm_contour_gf),intent(inout) :: G
-    if( .not.g%status )call error("ERROR contour_gf/mpi_bcast_kbm_contour_gf: object function not allocated.")    
-    call MPI_BCAST(G%less(0:,0:),size(G%less(0:,0:)),MPI_DOUBLE_COMPLEX,0,MPI_COMM_WORLD,MPIerr)
-    call MPI_BCAST(G%gtr(0:,0:) ,size(G%gtr(0:,0:)) ,MPI_DOUBLE_COMPLEX,0,MPI_COMM_WORLD,MPIerr)
-    call MPI_BCAST(G%lmix(0:,0:),size(G%lmix(0:,0:)),MPI_DOUBLE_COMPLEX,0,MPI_COMM_WORLD,MPIerr)
-    call MPI_BCAST(G%gmix(0:,0:),size(G%gmix(0:,0:)),MPI_DOUBLE_COMPLEX,0,MPI_COMM_WORLD,MPIerr)
-    call MPI_BCAST(G%mats(0:,0:),size(G%mats(0:,0:)),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,MPIerr)
-    call MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
-  end subroutine mpi_bcast_kbm_contour_gf
-
-  !******************************************************************
-  !******************************************************************
-  !******************************************************************
-
 
 END MODULE CONTOUR_GF
