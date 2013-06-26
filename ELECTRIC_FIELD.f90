@@ -5,7 +5,7 @@
 !     AUTHORS  : Adriano Amaricci
 !#####################################################################
 MODULE ELECTRIC_FIELD
-  USE VARS_GLOBAL
+  USE NEQ_VARS_GLOBAL
   implicit none
   private
 
@@ -39,7 +39,7 @@ contains
          field_type=="pulse".OR.&
          field_type=="ramp"
     if(.not.check)call error("ELECTRIC_FIELD/Afield: wrong field_type. set:dc,ac,acdc,pulse,ramp")
-    if(mpiID==0)call print_Afield_form(t(0:nstep))
+    call print_Afield_form(t)
   end subroutine set_efield_vector
 
 

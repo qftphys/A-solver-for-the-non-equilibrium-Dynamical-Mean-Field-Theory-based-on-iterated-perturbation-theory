@@ -29,17 +29,17 @@ contains
     call get_thermostat_bath()
 
     !Read the functions:
-    call read_keldysh_contour_gf(G0,trim(data_dir)//"/G0")
-    call read_keldysh_contour_gf(locG,trim(data_dir)//"/locG")
-    call read_keldysh_contour_gf(Sigma,trim(data_dir)//"/Sigma")
+    call read_keldysh_contour_gf(G0,"G0")
+    call read_keldysh_contour_gf(locG,"locG")
+    call read_keldysh_contour_gf(Sigma,"Sigma")
 
-    call sread(trim(data_dir)//"/nk.data",nk(0:nstep,1:Lk))
+    call sread("nk.neq",nk(:,1:Lk))
 
     if(fchi)then
-       call sread(trim(data_dir)//"/locChi_11.data",chi(1,1,0:nstep,0:nstep))
-       call sread(trim(data_dir)//"/locChi_12.data",chi(1,2,0:nstep,0:nstep))
-       call sread(trim(data_dir)//"/locChi_21.data",chi(2,1,0:nstep,0:nstep))
-       call sread(trim(data_dir)//"/locChi_22.data",chi(2,2,0:nstep,0:nstep))
+       call sread("locChi_11.neq",chi(1,1,:,:))
+       call sread("locChi_12.neq",chi(1,2,:,:))
+       call sread("locChi_21.neq",chi(2,1,:,:))
+       call sread("locChi_22.neq",chi(2,2,:,:))
     endif
 
     return

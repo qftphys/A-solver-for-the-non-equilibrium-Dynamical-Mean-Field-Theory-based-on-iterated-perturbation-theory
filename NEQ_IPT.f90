@@ -2,8 +2,8 @@
 !     PURPOSE  : A non-equilibrium IPT solver module. 
 !     AUTHORS  : Adriano Amaricci
 !###############################################################
-module IPT_NEQ
-  USE VARS_GLOBAL
+module NEQ_IPT
+  USE NEQ_VARS_GLOBAL
   implicit none
   private
 
@@ -21,17 +21,17 @@ contains
     logical :: init,checknk
     integer :: i,j,ik
 
-    init = inquire_keldysh_contour_gf(trim(irdSFILE))
+    init = inquire_keldysh_contour_gf(irdSFILE)
     if(init)then
        call msg(bold("Reading components of the input Self-energy and nk"))
-       call read_keldysh_contour_gf(Sigma,trim(irdSFILE))
+       call read_keldysh_contour_gf(Sigma,irdSFILE)
     else
        call msg(bold("Start from the Hartree-Fock self-energy"))
        Sigma=zero
     endif
 
-    inquire(file=trim(irdnkfile),exist=checkNk)
-    if(.not.checkNk)inquire(file=trim(irdNkfile)//".gz",exist=checkNk)
+    inquire(file=reg(irdnkfile),exist=checkNk)
+    if(.not.checkNk)inquire(file=reg(irdNkfile)//".gz",exist=checkNk)
     if(checkNk)then
        call read_nkfile(eq_nk,trim(irdnkfile))
     else
@@ -40,7 +40,7 @@ contains
           eq_nk(ik)=fermi((epsik(ik)),beta)
        enddo
     endif
-    if(mpiID==0)call splot("ic_nkVSepsk.ipt",epsik,eq_nk)
+    call splot("init_nkVSepsk.ipt",epsik,eq_nk)
 
   contains
 
@@ -76,23 +76,24 @@ contains
   !PURPOSE  : BUild the 2^nd IPT sigma functions:
   !+-------------------------------------------------------------------+
   subroutine neq_solve_ipt()
-    integer      :: i,j,itau
-    real(8),dimension(0:nstep)            :: nt             !occupation(time)
-
+    integer    :: i,j,k
+    complex(8) :: G0less,G0gtr
     call msg("Get Sigma(t,t')")
-
-    forall(i=0:nstep,j=0:nstep)
-       Sigma%less(i,j) = (U**2)*(G0%less(i,j)**2)*G0%gtr(j,i)    !get Sigma^<(t,t`)
-       Sigma%gtr (i,j) = (U**2)*(G0%gtr(i,j)**2)*G0%less(j,i)    !get Sigma^>(t,t`)
-    end forall
-
+    do i=1,nstep
+       do j=1,nstep
+          k =pack_index(i,j,nstep)
+          G0less = pack_less_tri(i,j,G0)
+          G0gtr  = pack_gtr_tri(j,i,G0)
+          Sigma%less(k) = U**2*G0less**2*G0gtr
+          !
+          G0gtr = pack_gtr_tri(i,j,G0)
+          G0less= pack_less_tri(j,i,G0)
+          Sigma%gtr(k)  = U**2*G0gtr**2*G0less
+       enddo
+    enddo
     !Save data:
-    if(mpiID==0)then
-       call write_keldysh_contour_gf(Sigma,trim(data_dir)//"/Sigma")
-       if(plot3D)call plot_keldysh_contour_gf(Sigma,t(0:),trim(plot_dir)//"/Sigma")
-       forall(i=0:nstep)nt(i)=-xi*Sigma%less(i,i)
-       call splot("nsVStime.ipt",t(0:),nt(0:),append=.true.)
-    endif
+    call msg("Saving Sigma function:")
+    call write_keldysh_contour_gf(Sigma,"Sigma")
   end subroutine neq_solve_ipt
 
 
@@ -106,4 +107,4 @@ contains
 
 
 
-end module IPT_NEQ
+end module NEQ_IPT

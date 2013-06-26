@@ -1,69 +1,15 @@
 !#####################################################################
-!     Program  : VARS_GLOBAL
 !     PURPOSE  : Defines the global variables used thru all the code
-!     AUTHORS  : Adriano Amaricci
+!     AUTHORS  : G.Mazza & A.Amaricci
 !#####################################################################
-! NAME
-! neqDMFT
-! DESCRIPTION
-!   Run the non-equilibrium DMFT in presence of an external electric field E. 
-!   The field is controlled by few flags in the nml/cmd options. It can be 
-!   constant, pulse or switched off smoothly. Many more fields can be added by  
-!   simply coding them in ELECTRIC_FIELD.f90. The executable read the file
-!   *inputFILE.ipt, if not found dump default values to a defualt file.
-!
-!   The output consist of very few data files that contain all the information,
-!   these are eventually read by a second program *get_data_neqDMFT to extract 
-!   all the relevant information.
-!   In this version the impurity solver is: IPT
-! OPTIONS (important)
-!  dt=[0.1]            -- Time step for solution of KB equations
-!  beta=[100.0]             -- Inverse temperature 
-!  U=[6]                    -- Hubbard local interaction value
-!  Efield=[0]               -- Strenght of the electric field
-!  Vbath=[0]                -- Strenght of the coupling to bath (Lambda=Vbath^2/Wbath)
-!  Wbath=[10.0]             -- Bandwidth of the fermionic thermostat
-!  ts=[1]                   -- Hopping parameter
-!  nstep=[50]               -- Number of time steps: T_max = dt*nstep
-!  nloop=[30]               -- Maximum number of DMFT loops allowed (then exit)
-!  eps_error=[1.d-4]        -- Tolerance on convergence
-!  weight=[0.9]             -- Mixing parameter
-!  Nsuccess =[2]            -- Number of consecutive success for convergence to be true
-!  Ex=[1]                   -- X-component of the Electric field vector
-!  Ey=[1]                   -- Y-component of the Electric field vector
-!  t0=[0]                   -- Switching on time parameter for the Electric field
-!  t1=[10^6]                -- Switching off time parameter for the Electric field
-!  Ncycles=[3]              -- Number of cycles in the  gaussian packect envelope for the impulsive field. fix width.
-!  omega0=[pi]            -- Frequency of the of the Oscillating Electric field        
-!  E1=[0]                   -- Strenght of the electric field for the AC+DC case, to be tuned to resonate
-!  field_type=[dc]       -- Type of electric field profile (dc,ac,ac+dc,etc..)
-!  bath_type=[flat]     -- Fermionic thermostat type (constant,gaussian,bethe,etc..)
-!  int_method=["trapz"]     -- 
-!  data_dir=[DATAneq]       -- Name of the directory containing data files
-!  plot_dir=[PLOT]          -- Name of the directory containing plot files
-!  fchi=[F]                 -- Flag for the calculation of the optical response
-!  L=[1024]                 -- A large number for whatever reason
-!  Ltau=[200]               -- A large number for whatever reason
-!  P=[5]                    -- Uniform Power mesh power-mesh parameter
-!  Q=[5]                    -- Uniform Power mesh uniform-mesh parameter
-!  eps=[0.05d0]             -- Broadening on the real-axis
-!  Nx=[50]                  -- Number of k-points along x-axis 
-!  Ny=[50]                  -- Number of k-points along y-axis 
-!  solve_wfftw =[F]         -- 
-!  plot3D=[F]       -- 
-!  Lkreduced=[200]  -- 
-!  eps=[0.05d0]         -- 
-!  irdSFILE=[restartSigma]-- 
-!  irdNkFILE=[restartNk]-- 
-!#####################################################################
-MODULE VARS_GLOBAL
+!include "ReadMe"
+MODULE NEQ_VARS_GLOBAL
   !Local:
   USE CONTOUR_GF
   !SciFor library
   USE SCIFOR_VERSION
   USE COMMON_VARS
   USE PARSE_CMD
-  USE GREENFUNX
   USE TIMER
   USE VECTORS
   USE SQUARE_LATTICE
@@ -71,9 +17,8 @@ MODULE VARS_GLOBAL
   USE IOTOOLS
   USE FFTGF
   USE FUNCTIONS
-  USE SPLINE
+  USE INTERPOLATE
   USE TOOLS
-  USE MPI
   implicit none
 
   !Version revision
@@ -81,9 +26,9 @@ MODULE VARS_GLOBAL
 
   !Gloabl  variables
   !=========================================================
-  integer                                :: nstep         !Number of Time steps
+  integer                                :: Nstep         !Number of Time steps
+  integer                                :: Nfit
   integer                                :: L             !a big number
-  integer                                :: Ltau          !Imaginary time slices
   integer                                :: Lk            !total lattice  dimension
   integer                                :: Lkreduced     !reduced lattice dimension
   integer                                :: Nx,Ny         !lattice grid dimensions
@@ -94,6 +39,7 @@ MODULE VARS_GLOBAL
   real(8)                                :: Vbath          !Hopping amplitude to the BATH
   real(8)                                :: Wbath          !Width of the BATH DOS
   real(8)                                :: dt,dtau        !time step
+  real(8)                                :: dtfit
   real(8)                                :: fmesh          !freq. step
   real(8)                                :: beta           !inverse temperature
   real(8)                                :: eps            !broadening
@@ -119,7 +65,7 @@ MODULE VARS_GLOBAL
 
   !FREQS & TIME ARRAYS:
   !=========================================================  
-  real(8),dimension(:),allocatable       :: wr,t,wm
+  real(8),dimension(:),allocatable       :: wr,t,wm,tfit
   real(8),dimension(:),allocatable       :: tau
 
 
@@ -138,12 +84,13 @@ MODULE VARS_GLOBAL
   real(8)                                :: omega0        !parameter for the Oscilatting field and Pulsed light
   real(8)                                :: E1            !Electric field strenght for the AC+DC case (tune to resonate)
 
-  !EQUILIUBRIUM (and Wigner transformed) GREEN'S FUNCTION 
-  !=========================================================
-  type(keldysh_equilibrium_gf)           :: gf0
-  type(keldysh_equilibrium_gf)           :: gf
-  type(keldysh_equilibrium_gf)           :: sf
-  real(8),dimension(:),allocatable       :: exa
+
+  ! !EQUILIUBRIUM (and Wigner transformed) GREEN'S FUNCTION 
+  ! !=========================================================
+  ! type(keldysh_equilibrium_gf)           :: gf0
+  ! type(keldysh_equilibrium_gf)           :: gf
+  ! type(keldysh_equilibrium_gf)           :: sf
+  ! real(8),dimension(:),allocatable       :: exa
 
 
   !NON-EQUILIBRIUM FUNCTIONS:
@@ -171,11 +118,6 @@ MODULE VARS_GLOBAL
 
 
 
-  !DATA DIRECTORY:
-  !=========================================================
-  character(len=32)                      :: data_dir,plot_dir
-
-
   !NAMELISTS:
   !=========================================================
   namelist/variables/&
@@ -186,7 +128,6 @@ MODULE VARS_GLOBAL
        ts           ,& 
        eps          ,& 
        L            ,& 
-       Ltau         ,& 
        Lkreduced    ,& 
                                 !DMFT
        nloop        ,& 
@@ -222,9 +163,8 @@ MODULE VARS_GLOBAL
        fupdate      ,&
                                 !FILES&DIR:
        irdSFILE      ,& 
-       irdNkFILE     ,& 
-       data_dir     ,& 
-       plot_dir
+       irdNkFILE
+
 
 
 
@@ -251,7 +191,6 @@ contains
     ts           = 1.d0
     eps          = 0.01d0
     L            = 2048  
-    Ltau         = 200
     Lkreduced    = 300
     !DMFT
     nloop        = 30
@@ -288,8 +227,6 @@ contains
     !FILES&DIR:
     irdSFILE      = 'restartSigma'
     irdNkFILE      = 'restartNk'
-    data_dir     = 'DATAneq'
-    plot_dir     = 'PLOT'
 
     inquire(file=adjustl(trim(inputFILE)),exist=control)
     if(control)then
@@ -311,7 +248,6 @@ contains
     call parse_cmd_variable(ts           ,"TS")
     call parse_cmd_variable(eps          ,"EPS")
     call parse_cmd_variable(L            ,"L")
-    call parse_cmd_variable(Ltau         ,"LTAU")
     call parse_cmd_variable(Lkreduced    ,"LKREDUCED")
     !DMFT
     call parse_cmd_variable(nloop        ,"NLOOP")
@@ -348,30 +284,23 @@ contains
     !FILES&DIR:
     call parse_cmd_variable(irdSFILE      ,"IRDSFILE")
     call parse_cmd_variable(irdNkFILE     ,"IRDNKFILE")
-    call parse_cmd_variable(data_dir     ,"DATA_DIR")
-    call parse_cmd_variable(plot_dir     ,"PLOT_DIR")
+
 
     if(U==0.d0)Nloop=1
+    Nfit=2*Nstep
 
-    if(mpiID==0)then
-       write(*,*)"CONTROL PARAMETERS"
-       write(*,nml=variables)
-       write(*,*)"--------------------------------------------"
-       write(*,*)""
-       call dump_input_file("used.")
-    endif
-
-    call create_data_dir(trim(data_dir))
-    if(plot3D)call create_data_dir(trim(plot_dir))
+    write(*,*)"CONTROL PARAMETERS"
+    write(*,nml=variables)
+    write(*,*)"--------------------------------------------"
+    write(*,*)""
+    call dump_input_file("used.")
 
   contains
     subroutine dump_input_file(prefix)
       character(len=*) :: prefix
-      if(mpiID==0)then
-         open(10,file=trim(adjustl(trim(prefix)))//adjustl(trim(inputFILE)))
-         write(10,nml=variables)
-         close(10)
-      endif
+      open(10,file=reg(prefix)//adjustl(trim(inputFILE)))
+      write(10,nml=variables)
+      close(10)
     end subroutine dump_input_file
   end subroutine read_input_init
   !******************************************************************
@@ -388,31 +317,19 @@ contains
   subroutine global_memory_allocation()
     integer          :: i
     real(8)          :: ex
-    call msg("Allocating the memory")
+    call msg("Allocating the arrays")
     !Weiss-fields:
-    call allocate_keldysh_contour_gf(G0,Nstep)    
+    call allocate_keldysh_contour_gf(G0,Nstep*(Nstep+1)/2)
     !Interaction self-energies:
-    call allocate_keldysh_contour_gf(Sigma,Nstep)
+    call allocate_keldysh_contour_gf(Sigma,Nstep**2)
     !Local Green's functions:
-    call allocate_keldysh_contour_gf(locG,Nstep)
+    call allocate_keldysh_contour_gf(locG,Nstep*(Nstep+1)/2)
     !Bath self-energies:
-    call allocate_keldysh_contour_gf(S0,Nstep)
+    call allocate_keldysh_contour_gf(S0,Nfit**2)
     !Momentum-distribution:
-    allocate(nk(0:nstep,Lk),eq_nk(Lk))
-    !Equilibrium/Wigner rotated Green's function
-    call allocate_gf(gf0,nstep)
-    call allocate_gf(gf,nstep)
-    call allocate_gf(sf,nstep)
-
+    allocate(nk(Nstep,Lk),eq_nk(Lk))
     !Susceptibility/Optical response
-    if(fchi)allocate(chi(2,2,0:nstep,0:nstep))
-    !Other:
-    allocate(exa(-nstep:nstep))
-    ex=-1.d0       
-    do i=-nstep,nstep
-       ex=-ex
-       exa(i)=ex
-    enddo
+    if(fchi)allocate(chi(2,2,Nstep,Nstep))
   end subroutine global_memory_allocation
 
   !******************************************************************
@@ -420,5 +337,5 @@ contains
   !******************************************************************
 
 
-end module VARS_GLOBAL
+end module NEQ_VARS_GLOBAL
 
