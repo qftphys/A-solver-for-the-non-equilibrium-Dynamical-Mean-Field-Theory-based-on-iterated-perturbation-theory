@@ -49,11 +49,12 @@ contains
        mat_G0 = mat_locG + mat_Sigma                    !Get G0^-1 matrix:
        mat_G0 = mat_G0*dt**2                            !Invert G0^-1
        call matrix_inverse(mat_G0)
-       do k=1,G0%N              !=Nstep*(Nstep+1)/2     !Get G0 components 
-          i = unpack_index_i(k,Nstep)
-          j = unpack_index_j(k,Nstep)
-          G0%less(k) = -mat_G0(i,Nstep+j)
-          G0%gtr(k)  =  mat_G0(Nstep+i,j)
+       do i=1,Nstep
+          do j=1,Nstep
+             k = pack_index_tri(i,j)
+             G0%less(k) = -mat_G0(i,Nstep+j)
+             G0%gtr(k)  =  mat_G0(Nstep+i,j)
+          enddo
        enddo
 
     case(2)
@@ -77,18 +78,18 @@ contains
        G0ret = matmul(GammaRet,locGret)*dt
        !### COMMENTING THIS LINE THE RESULTS ARE IDENTICAL WITH THE THREE METHODS OF UPDATE ###
        !forall(i=1:nstep)G0ret(i,i)=-xi !???
-       !#####################################################################################
        !G0less = GammaR^-1 * Gless * GammaA^-1  -  gR * Sless * gA
        G0less = matmul(GammaRet,matmul(locGless,conjg(transpose(GammaRet)))*dt)*dt -&
             matmul(G0ret,matmul(Sless,conjg(transpose(G0ret)))*dt)*dt
        !G0gtr  = GammaR^-1 * Ggtr * GammaA^-1   -  gR * Sgtr * gA
        G0gtr  = matmul(GammaRet,matmul(locGgtr,conjg(transpose(GammaRet)))*dt)*dt  -&
             matmul(G0ret,matmul(Sgtr,conjg(transpose(G0ret)))*dt)*dt
-       do k=1,G0%N
-          i = unpack_index_i(k,Nstep)
-          j = unpack_index_j(k,Nstep)
-          G0%less(k) = G0less(i,j)
-          G0%gtr(k)  = G0gtr(i,j)
+       do i=1,Nstep
+          do j=1,Nstep
+             k = pack_index_tri(i,j)
+             G0%less(k) = G0less(i,j)
+             G0%gtr(k)  = G0gtr(i,j)
+          enddo
        enddo
 
 
@@ -106,16 +107,14 @@ contains
        mat_Gamma = mat_Gamma*dt**2
        call matrix_inverse(mat_Gamma)
        mat_G0  = matmul(mat_locG,mat_Gamma)*dt
-       !
-       do k=1,G0%N              !=Nstep*(Nstep+1)/2
-          i = unpack_index_i(k,Nstep)
-          j = unpack_index_j(k,Nstep)
-          G0%less(k) = -mat_G0(i,Nstep+j)
-          G0%gtr(k)  =  mat_G0(Nstep+i,j)
+       do i=1,Nstep
+          do j=1,Nstep             
+             k = pack_index_tri(i,j)
+             G0%less(k) = -mat_G0(i,Nstep+j)
+             G0%gtr(k)  =  mat_G0(Nstep+i,j)
+          enddo
        enddo
-       !
        deallocate(mat_Delta,mat_Gamma)
-
 
     end select
 

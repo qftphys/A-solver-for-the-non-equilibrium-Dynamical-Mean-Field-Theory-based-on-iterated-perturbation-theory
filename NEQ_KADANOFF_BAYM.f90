@@ -4,9 +4,14 @@ MODULE NEQ_KADANOFF_BAYM
   implicit none
   private
 
-
-  real(8),dimension(4,4)   :: A
-  real(8),dimension(4)     :: B,C
+  !Runge-Kutta coefficients:
+  real(8),dimension(4,4)   :: A=reshape([ &
+       0.d0,0.5d0, 0.d0, 0.d0, &
+       0.d0, 0.d0,0.5d0, 0.d0, &
+       0.d0, 0.d0, 0.d0, 1.d0, &
+       0.d0, 0.d0, 0.d0, 0.d0],shape(A))
+  real(8),dimension(4)     :: B=[1.d0/6.d0,1.d0/3.d0,1.d0/3.d0,1.d0/6.d0]
+  real(8),dimension(4)     :: C=[0.d0,0.5d0,0.5d0,1.d0]
 
   !k-dependent GF:
   type(keldysh_contour_gf) :: Gk
@@ -16,7 +21,7 @@ MODULE NEQ_KADANOFF_BAYM
   type(keldysh_contour_gf) :: Icoll                          !+-> collision integral up to time tn 
   type(keldysh_contour_gf) :: delta_Icoll                    !+-> correction to the collision integral for times in [tn + t_rk]
 
-  type(keldysh_contour_gf) :: Sfit
+  type(keldysh_contour_gf) :: Sigma_dmft
 
   public                   :: neq_get_localgf
 
@@ -47,12 +52,15 @@ contains
     call allocate_keldysh_contour_gf(tmpG1,Nstep)
     call allocate_keldysh_contour_gf(tmpG2,Nstep)
     call allocate_keldysh_contour_gf(delta_Icoll,Nstep)
+    call allocate_keldysh_contour_gf(Sigma_dmft,Nfit**2)
+    !Here you can add manipulation of the Sigma functions so that 
+    !only one function is considered in the following.
 
     !Set to Zero GF and nk:
     locG   = zero
     nk     = 0.d0
 
-    call RKcoeff(A,B,C)
+    call interpolate_sigma(t,Sigma,Nstep,tfit,Sigma_dmft,Nfit,5)
 
     !=============START K-POINTS LOOP======================
     call start_timer
@@ -82,6 +90,7 @@ contains
     call deallocate_keldysh_contour_gf(tmpG2)
     call deallocate_keldysh_contour_gf(delta_Icoll)
     call deallocate_keldysh_contour_gf(Icoll)
+    call deallocate_keldysh_contour_gf(Sigma_dmft)
   end subroutine kadanoff_baym_to_localgf
 
 
@@ -411,28 +420,6 @@ contains
 
 
 
-  subroutine RKcoeff(A,B,C)
-    real(8),dimension(4,4),intent(inout) :: A
-    real(8),dimension(4),intent(inout)     :: B,C
-    A=0.d0
-    B=0.d0
-    C=0.d0
-    A(2,1) = 0.5d0
-    A(3,2) = 0.5d0
-    A(4,3) = 1.d0
-    C(2) = 0.5d0
-    C(3) = 0.5d0
-    C(4) = 1.d0
-    B(1) = 1.d0/6.d0
-    B(2) = 1.d0/3.d0
-    B(3) = 1.d0/3.d0
-    B(4) = 1.d0/6.d0
-  end subroutine rkcoeff
-
-
-
-
-
   ! ##################################################################
   ! ##################################################################
   ! ##################################################################
@@ -460,8 +447,8 @@ contains
 
     it_sigma = pack_index(it,jt,Nfit)
 
-    Sigma_less = S0%less(it_sigma) !+Sigma_dmft_less(it_sigma)
-    Sigma_gtr  = S0%gtr(it_sigma)
+    Sigma_less = S0%less(it_sigma) +Sigma_dmft%less(it_sigma)
+    Sigma_gtr  = S0%gtr(it_sigma)  +Sigma_dmft%gtr(it_sigma)
 
     Sigma_ret = Sigma_gtr - Sigma_less
     ft_less   = Sigma_ret*green_less
@@ -485,8 +472,8 @@ contains
 
     it_sigma = pack_index(it,jt,Nfit)
 
-    Sigma_less = S0%less(it_sigma) !+Sigma_dmft_less(it_sigma)
-    Sigma_gtr  = S0%gtr(it_sigma)
+    Sigma_less = S0%less(it_sigma) +Sigma_dmft%less(it_sigma)
+    Sigma_gtr  = S0%gtr(it_sigma)  +Sigma_dmft%gtr(it_sigma)
     Sigma_ret = Sigma_gtr - Sigma_less
     ft_gtr   = Sigma_ret*green_gtr
     if ( swap_tt ) ft_gtr = Sigma_ret*swap_time_gf(green_gtr)
@@ -511,8 +498,8 @@ contains
 
     it_sigma = pack_index(it,jt,Nfit)
 
-    Sigma_less    = S0%less(it_sigma) !+Sigma_dmft_less(it_sigma)
-    Sigma_gtr     = S0%gtr(it_sigma)
+    Sigma_less    = S0%less(it_sigma) +Sigma_dmft%less(it_sigma)
+    Sigma_gtr     = S0%gtr(it_sigma)  +Sigma_dmft%gtr(it_sigma)
     ft_prime_less = -Sigma_less*(green_gtr - green_less)
     if(swap_tt)ft_prime_less = -Sigma_less*(swap_time_gf(green_gtr)-swap_time_gf(green_less))
   end function timeCorr_ft_prime_less
@@ -531,8 +518,8 @@ contains
 
     it_sigma = pack_index(it,jt,Nfit)
 
-    Sigma_less    = S0%less(it_sigma) !+Sigma_dmft_less(it_sigma)
-    Sigma_gtr     = S0%gtr(it_sigma)
+    Sigma_less    = S0%less(it_sigma) +Sigma_dmft%less(it_sigma)
+    Sigma_gtr     = S0%gtr(it_sigma)  +Sigma_dmft%gtr(it_sigma)
 
     ft_prime_gtr = -Sigma_gtr*(green_gtr - green_less)
     if(swap_tt)ft_prime_gtr = -Sigma_gtr*(swap_time_gf(green_gtr)-swap_time_gf(green_less))
@@ -585,6 +572,44 @@ contains
   !******************************************************************
 
 
+
+  subroutine interpolate_sigma(tin,Sin,Nin,tout,Sout,Nout,Np)
+    type(keldysh_contour_gf)              :: Sin,Sout
+    real(8),dimension(Nin)                :: tin
+    real(8),dimension(Nout)               :: tout
+    integer                               :: Nin,Nout,Np
+    complex(8),dimension(:,:),allocatable :: self_less,self_gtr
+    complex(8),dimension(:,:),allocatable :: sfit_less,sfit_gtr
+    integer                               :: k,i,j
+    if(.not.Sin%status.OR..not.Sout%status)stop "INTERPOLATE_SIGMA: unallocated arrays"
+    if(Sin%N/=Nin**2.OR.Sout%N/=Nout**2)stop "INTERPOLATE_SIGMA: wrong dimensions"
+    allocate(self_less(Nin,Nin)  ,self_gtr(Nin,Nin))
+    allocate(sfit_less(Nout,Nout),sfit_gtr(Nout,Nout))
+    do i=1,Nin
+       do j=1,Nin
+          self_less(i,j)=pack_less(i,j,Nin,Sin)
+          self_gtr(i,j)=pack_gtr(i,j,Nin,Sin)
+       enddo
+    enddo
+    call splot3d("self_less.dat",tin,tin,self_less)
+    call poly_spline2d(tin,tin,self_less,tout,tout,sfit_less,Np)
+    call poly_spline2d(tin,tin,self_gtr,tout,tout,sfit_gtr,Np)
+    call splot3d("sfit_less.dat",tout,tout,sfit_less)
+    do i=1,Nout
+       do j=1,Nout
+          k = pack_index(i,j,Nout)
+          Sout%less(k) = sfit_less(i,j)
+          Sout%gtr(k)  = sfit_gtr(i,j)
+       enddo
+    enddo
+    deallocate(self_less,self_gtr,sfit_less,sfit_gtr)
+  end subroutine interpolate_sigma
+
+
+
+  !******************************************************************
+  !******************************************************************
+  !******************************************************************
 
 
   !+-------------------------------------------------------------------+
