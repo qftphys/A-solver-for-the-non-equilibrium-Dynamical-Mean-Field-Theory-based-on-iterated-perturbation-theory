@@ -55,7 +55,9 @@ MODULE NEQ_VARS_GLOBAL
   real(8)                                :: Wgap          !gap of the gapped bath
   logical                                :: plot3D,fchi
   logical                                :: solve_eq
+  integer                                :: dynflag !flag for the Kadanoff-Baym equations solver: 0:predictor-corrector, 1=Runge-Kutta4
   integer                                :: fupdate !flag to decide WFupdate procedure
+
   !
 
   !FILES TO RESTART
@@ -161,6 +163,7 @@ MODULE NEQ_VARS_GLOBAL
        plot3D       ,& 
        fchi         ,& 
        fupdate      ,&
+       dynflag      ,&
                                 !FILES&DIR:
        irdSFILE      ,& 
        irdNkFILE
@@ -224,6 +227,7 @@ contains
     plot3D       = .false.
     fchi         = .false.
     fupdate      = 0
+    dynflag      = 1
     !FILES&DIR:
     irdSFILE      = 'restartSigma'
     irdNkFILE      = 'restartNk'
@@ -281,6 +285,7 @@ contains
     call parse_cmd_variable(plot3D       ,"PLOT3D")
     call parse_cmd_variable(fchi         ,"FCHI")
     call parse_cmd_variable(fupdate      ,"FUPDATE")
+    call parse_cmd_variable(dynflag      ,"DYNFLAG")
     !FILES&DIR:
     call parse_cmd_variable(irdSFILE      ,"IRDSFILE")
     call parse_cmd_variable(irdNkFILE     ,"IRDNKFILE")
@@ -331,6 +336,7 @@ contains
     !Susceptibility/Optical response
     if(fchi)allocate(chi(2,2,Nstep,Nstep))
   end subroutine global_memory_allocation
+
 
   !******************************************************************
   !******************************************************************

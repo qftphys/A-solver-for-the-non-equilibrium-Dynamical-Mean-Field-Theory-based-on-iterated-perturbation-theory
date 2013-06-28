@@ -5,13 +5,13 @@ MODULE NEQ_KADANOFF_BAYM
   private
 
   !Runge-Kutta coefficients:
-  real(8),dimension(4,4)   :: A=reshape([ &
+  real(8),dimension(4,4),parameter   :: A=reshape([ &
        0.d0,0.5d0, 0.d0, 0.d0, &
        0.d0, 0.d0,0.5d0, 0.d0, &
        0.d0, 0.d0, 0.d0, 1.d0, &
        0.d0, 0.d0, 0.d0, 0.d0],shape(A))
-  real(8),dimension(4)     :: B=[1.d0/6.d0,1.d0/3.d0,1.d0/3.d0,1.d0/6.d0]
-  real(8),dimension(4)     :: C=[0.d0,0.5d0,0.5d0,1.d0]
+  real(8),dimension(4),parameter     :: B=[1.d0/6.d0,1.d0/3.d0,1.d0/3.d0,1.d0/6.d0]
+  real(8),dimension(4),parameter     :: C=[0.d0,0.5d0,0.5d0,1.d0]
 
   !k-dependent GF:
   type(keldysh_contour_gf) :: Gk
@@ -44,8 +44,8 @@ contains
   !+-------------------------------------------------------------------+
   subroutine kadanoff_baym_to_localgf()
     integer                  :: istep,i,j,ik,k
-
-    call msg("Entering Kadanoff-Baym")
+    integer,save :: loop=0
+    call msg("Entering Kadanoff-Baym / Runge-Kutta4")
 
     call allocate_keldysh_contour_gf(Gk,Nstep*(Nstep+1)/2)
     call allocate_keldysh_contour_gf(Icoll,Nstep)
@@ -60,8 +60,10 @@ contains
     locG   = zero
     nk     = 0.d0
 
-    call interpolate_sigma(t,Sigma,Nstep,tfit,Sigma_dmft,Nfit,5)
-
+    call interpolate_sigma(t,Sigma,Nstep,tfit,Sigma_dmft,Nfit,10)
+    loop=loop+1
+    call plot_keldysh_contour_gf(tfit,Sigma_dmft,"Sigma_dmft_"//txtfy(loop))
+    !stop
     !=============START K-POINTS LOOP======================
     call start_timer
     do ik=1,Lk
@@ -447,8 +449,8 @@ contains
 
     it_sigma = pack_index(it,jt,Nfit)
 
-    Sigma_less = S0%less(it_sigma) +Sigma_dmft%less(it_sigma)
-    Sigma_gtr  = S0%gtr(it_sigma)  +Sigma_dmft%gtr(it_sigma)
+    Sigma_less = S0%less(it_sigma) + Sigma_dmft%less(it_sigma)
+    Sigma_gtr  = S0%gtr(it_sigma)  + Sigma_dmft%gtr(it_sigma)
 
     Sigma_ret = Sigma_gtr - Sigma_less
     ft_less   = Sigma_ret*green_less
@@ -573,38 +575,108 @@ contains
 
 
 
+  ! subroutine interpolate_sigma(tin,Sin,Nin,tout,Sout,Nout,Np)
+  !   type(keldysh_contour_gf)              :: Sin,Sout
+  !   real(8),dimension(Nin)                :: tin
+  !   real(8),dimension(Nout)               :: tout
+  !   integer                               :: Nin,Nout,Np
+  !   complex(8),dimension(:,:),allocatable :: self_less,self_gtr
+  !   complex(8),dimension(:,:),allocatable :: sfit_less,sfit_gtr
+  !   integer                               :: k,i,j
+  !   if(.not.Sin%status.OR..not.Sout%status)stop "INTERPOLATE_SIGMA: unallocated arrays"
+  !   if(Sin%N/=Nin**2.OR.Sout%N/=Nout**2)stop "INTERPOLATE_SIGMA: wrong dimensions"
+  !   allocate(self_less(Nin,Nin)  ,self_gtr(Nin,Nin))
+  !   allocate(sfit_less(Nout,Nout),sfit_gtr(Nout,Nout))
+  !   do i=1,Nin
+  !      do j=1,Nin
+  !         self_less(i,j)=pack_less(i,j,Nin,Sin)
+  !         self_gtr(i,j)=pack_gtr(i,j,Nin,Sin)
+  !      enddo
+  !   enddo
+  !   call splot3d("self_less.neq",tin,tin,self_less)
+  !   call poly_spline2d(tin,tin,self_less,tout,tout,sfit_less,Np)
+  !   call poly_spline2d(tin,tin,self_gtr,tout,tout,sfit_gtr,Np)
+  !   call splot3d("sfit_less.neq",tout,tout,sfit_less)
+  !   do i=1,Nout
+  !      do j=1,Nout
+  !         k = pack_index(i,j,Nout)
+  !         Sout%less(k) = sfit_less(i,j)
+  !         Sout%gtr(k)  = sfit_gtr(i,j)
+  !      enddo
+  !   enddo
+  !   deallocate(self_less,self_gtr,sfit_less,sfit_gtr)
+  ! end subroutine interpolate_sigma
+
   subroutine interpolate_sigma(tin,Sin,Nin,tout,Sout,Nout,Np)
     type(keldysh_contour_gf)              :: Sin,Sout
     real(8),dimension(Nin)                :: tin
     real(8),dimension(Nout)               :: tout
+    complex(8)                            :: f
+    real(8)                               :: x,y
     integer                               :: Nin,Nout,Np
+    complex(8),dimension(:,:),allocatable :: diagin,diagout
     complex(8),dimension(:,:),allocatable :: self_less,self_gtr
     complex(8),dimension(:,:),allocatable :: sfit_less,sfit_gtr
-    integer                               :: k,i,j
+    integer                               :: k,i,j,ii,jj
+    
     if(.not.Sin%status.OR..not.Sout%status)stop "INTERPOLATE_SIGMA: unallocated arrays"
     if(Sin%N/=Nin**2.OR.Sout%N/=Nout**2)stop "INTERPOLATE_SIGMA: wrong dimensions"
     allocate(self_less(Nin,Nin)  ,self_gtr(Nin,Nin))
     allocate(sfit_less(Nout,Nout),sfit_gtr(Nout,Nout))
+
+    !Dump the compact arrays to matrices:
     do i=1,Nin
        do j=1,Nin
           self_less(i,j)=pack_less(i,j,Nin,Sin)
           self_gtr(i,j)=pack_gtr(i,j,Nin,Sin)
        enddo
     enddo
-    call splot3d("self_less.dat",tin,tin,self_less)
-    call poly_spline2d(tin,tin,self_less,tout,tout,sfit_less,Np)
-    call poly_spline2d(tin,tin,self_gtr,tout,tout,sfit_gtr,Np)
-    call splot3d("sfit_less.dat",tout,tout,sfit_less)
+    call splot3d("self_less.neq",tin,tin,self_less)
+
+    !1) fit the x-axis from diagonal to last point:
+    sfit_less=zero
+    sfit_gtr=zero
+    do i=1,Nin
+       call poly_spline(tin,self_less(:,i),tout,sfit_less(:,2*i-1),Np)
+       call poly_spline(tin,self_gtr(:,i),tout,sfit_gtr(:,2*i-1),Np)
+    enddo
+
+    !2) fit the diagonal:
+    allocate(diagin(2,Nin),diagout(2,Nout))
+    forall(i=1:Nin)
+       diagin(1,i)=self_less(i,i)
+       diagin(2,i)=self_gtr(i,i)
+    end forall
+    call poly_spline(tin,diagin(1,:),tout,diagout(1,:),Np)
+    call poly_spline(tin,diagin(2,:),tout,diagout(2,:),Np)
+    forall(i=1:Nout)
+       sfit_less(i,i)=diagout(1,i)
+       sfit_gtr(i,i)=diagout(2,i)
+    end forall
+    deallocate(diagin,diagout)
+
+    !3) fit the sub-diagonals
+    do i=2,Nin
+       x = tout(2*i-1)
+       y = tout(2*i-2)
+       call poly_spline(tin,self_less(i,:),y,f,Np)
+       sfit_less(2*i-1,2*i-2)=f
+       call poly_spline(tin,self_gtr(i,:),y,f,Np)
+       sfit_gtr(2*i-1,2*i-2)=f
+    enddo
+    call splot3d("sfit_less.neq",tout,tout,sfit_less)
+
     do i=1,Nout
        do j=1,Nout
+          ii=locate(tin,tout(i))
+          jj=locate(tin,tout(j))
           k = pack_index(i,j,Nout)
-          Sout%less(k) = sfit_less(i,j)
-          Sout%gtr(k)  = sfit_gtr(i,j)
+          Sout%less(k) = self_less(ii,jj)
+          Sout%gtr(k)  = self_gtr(ii,jj)
        enddo
     enddo
     deallocate(self_less,self_gtr,sfit_less,sfit_gtr)
   end subroutine interpolate_sigma
-
 
 
   !******************************************************************

@@ -12,6 +12,7 @@ program neqDMFT
   USE NEQ_IPT           !performs the non-eq. IPT. Write Sigma
   USE NEQ_UPDATE_WF     !contains routines for WF update and printing.
   USE NEQ_KADANOFF_BAYM !solves KB equations numerically to get k-sum
+  USE KADANOFBAYM
   USE RESULTS           !get results and print observables
   implicit none
 
@@ -64,6 +65,7 @@ program neqDMFT
 
      call neq_update_weiss_field !-|SELF-CONSISTENCY (in funx_neq)
      !
+
      call neq_solve_ipt          !-|IMPURITY SOLVER (in ipt_neq)
      !
      converged = convergence_check()

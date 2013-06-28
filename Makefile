@@ -14,7 +14,7 @@ ARGS=$(SFLIBS)
 
 BRANCH=  $(shell git rev-parse --abbrev-ref HEAD)
 
-OBJS =  CONTOUR_GF.o NEQ_VARS_GLOBAL.o ELECTRIC_FIELD.o BATH.o EQ_IPT.o NEQ_IPT.o NEQ_UPDATE_WF.o NEQ_KADANOFF_BAYM.o RESULTS.o
+OBJS =  CONTOUR_GF.o NEQ_VARS_GLOBAL.o ELECTRIC_FIELD.o BATH.o EQ_IPT.o NEQ_IPT.o NEQ_UPDATE_WF.o KADANOFBAYM.o NEQ_KADANOFF_BAYM.o RESULTS.o
 
 compile: version $(OBJS)
 	@echo " ..................... compile ........................... "

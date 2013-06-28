@@ -141,10 +141,10 @@ contains
           Jkvec(i,ix,iy)  = Jk
           Jloc(i)         = Jloc(i) +  wt(ik)*Jk !todo *2.d0 spin degeneracy
           Jheat(i)        = Jheat(i)+  wt(ik)*epi(i,ik)*Jk !todo *2.d0 spin degeneracy
-          if(i>1)Stot(i)         = Stot(i) -  2.d0*wt(ik)*(nk(i,ik)*log(nk(i,ik)))!+(1.d0-nk(i,ik))*log(1.d0-nk(i,ik)))
+          !if(i>1)Stot(i)  = Stot(i) -  2.d0*wt(ik)*(nk(i,ik)*log(nk(i,ik)))!+(1.d0-nk(i,ik))*log(1.d0-nk(i,ik)))
        enddo
     enddo
-    Stot(1)=0.d0
+    !Stot(1)=0.d0
 
     forall(i=1:nstep,ik=1:Lk)sorted_epi(i,ik) = epi(i,sorted_ik(ik))
     forall(ik=1:Lkreduced)reduced_epi(:,ik) = sorted_epi(:,reduced_ik(ik))
@@ -189,7 +189,7 @@ contains
        Xpos(i)=0.d0
        do ik=1,Lk
           ix=ik2ix(ik);iy=ik2iy(ik)          
-          do k=0,i
+          do k=1,i
              Jk=Jkvec(k,ix,iy)
              Xpos(i)=Xpos(i)+Jk*wt(ik)*dt
           enddo
@@ -376,7 +376,7 @@ contains
   !+-------------------------------------------------------------------+
   subroutine shift_kpoint(arrayIN,arrayOUT)
     integer                 :: i,j,ik,ix,iy,jk,jx,jy
-    real(8),dimension(0:,:) :: arrayIN,arrayOUT
+    real(8),dimension(:,:)  :: arrayIN,arrayOUT
     real(8),dimension(2)    :: pi_in
     integer,dimension(2)    :: pi_kcoord
     type(vect2D)            :: Ak
