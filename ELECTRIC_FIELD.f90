@@ -5,6 +5,7 @@
 !     AUTHORS  : Adriano Amaricci
 !#####################################################################
 MODULE ELECTRIC_FIELD
+  USE DERIVATE
   USE VARS_GLOBAL
   implicit none
   private

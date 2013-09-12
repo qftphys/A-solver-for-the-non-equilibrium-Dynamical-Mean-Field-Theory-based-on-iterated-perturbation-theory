@@ -68,11 +68,14 @@ MODULE VARS_GLOBAL
   USE VECTORS
   USE SQUARE_LATTICE
   USE INTEGRATE
+  USE DERIVATE
+  USE ARRAYS
   USE IOTOOLS
   USE FFTGF
   USE FUNCTIONS
   USE INTERPOLATE
   USE TOOLS
+  USE ERROR
   USE MPI
   implicit none
 
@@ -300,7 +303,7 @@ contains
        print*,"Can not find INPUT file"
        print*,"Dumping a default version in default."//trim(inputFILE)
        call dump_input_file("default.")
-       call error("Can not find INPUT file, dumping a default version in default."//trim(inputFILE))
+       stop
     endif
 
     !GLOBAL

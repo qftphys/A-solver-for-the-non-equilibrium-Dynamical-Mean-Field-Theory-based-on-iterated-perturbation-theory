@@ -22,15 +22,15 @@ contains
     integer          :: iw,i,j
     real(8)          :: en,w,dw,wfin,wini
     complex(8)       :: peso
-    real(8)          :: ngtr,nless,arg
+    real(8)          :: ngtr,nless,arg,lambda
     ! complex(8)       :: s0less_w(Lw),s0less_t(-Lw/2:Lw/2)
     ! complex(8)       :: s0gtr_w(Lw),s0gtr_t(-Lw/2:Lw/2)
-    call msg("Get Bath. Type: "//bold_green(trim(adjustl(trim(bath_type))))//" dissipative bath",id=0)
+    call msg("Get Bath. Type: "//bold_green(reg(bath_type))//" dissipative bath",id=0)
     call msg("Bath coupling is:"//txtfy(Vbath))
     call msg("Bath width is:"//txtfy(2.d0*Wbath))
-    Vbath=sqrt(Vbath*2.d0*Wbath)
-    call msg("Bath coupling amplitude is:"//txtfy(Vbath))
-    call create_data_dir("Bath")
+    lambda=Vbath*2.d0*Wbath
+    call msg("Bath coupling amplitude is:"//txtfy(lambda))
+    !call create_data_dir("Bath")
     Lw=L
     allocate(bath_dens(Lw),wfreq(Lw))
     wfin  = 2.d0*Wbath ; wini=-wfin
@@ -55,7 +55,7 @@ contains
        call get_bath_gapflat_dos()
 
     case default
-       call abort("Bath type:"//trim(adjustl(trim(bath_type)))//" not supported.")
+       call abort("Bath type:"//reg(bath_type)//" not supported.")
 
     end select
 
@@ -76,16 +76,16 @@ contains
           do i=0,nstep
              do j=0,nstep
                 peso=exp(-xi*(t(i)-t(j))*en)
-                S0%less(i,j)=S0%less(i,j)+ xi*Vbath**2*nless*peso*bath_dens(iw)*dw
-                S0%gtr(i,j) =S0%gtr(i,j) + xi*Vbath**2*ngtr*peso*bath_dens(iw)*dw
+                S0%less(i,j)=S0%less(i,j)+ xi*lambda*nless*peso*bath_dens(iw)*dw
+                S0%gtr(i,j) =S0%gtr(i,j) + xi*lambda*ngtr*peso*bath_dens(iw)*dw
              enddo
           enddo
        enddo
     endif
 
     if(mpiID==0)then
-       call splot("Bath/DOSbath.lattice",wfreq,bath_dens,append=.true.)
-       if(Vbath/=0.d0.AND.plot3D)call plot_keldysh_contour_gf(S0,t(0:),"Bath/S0")
+       call splot("DOSbath.lattice",wfreq,bath_dens,append=.true.)
+       if(Vbath/=0.d0.AND.plot3D)call plot_keldysh_contour_gf(S0,t(0:),"S0")
     endif
 
   end subroutine get_thermostat_bath

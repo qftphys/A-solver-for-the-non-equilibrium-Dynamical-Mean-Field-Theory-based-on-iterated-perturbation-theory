@@ -174,15 +174,15 @@ contains
           !First step: get collision integrals up to t=T=istep
           call get_Ikcollision(istep)
           Ikless0  = Ikless ; Ikgtr0   = Ikgtr
-          !Ikdiag   = real(Ikgtr(istep))-real(Ikless(istep))
-          Ikdiag   = -2.d0*real(Ikless(istep),8)
+          Ikdiag   = dreal(Ikgtr(istep))-dreal(Ikless(istep))
+          !Ikdiag   = -2.d0*real(Ikless(istep),8)
        case(2)
           !Second Pass: get collision integrals up to t=T+\Delta=istep+1
           call get_Ikcollision(istep+1)
           Ikless   = (Ikless  + Ikless0)/2.d0
           Ikgtr    = (Ikgtr   + Ikgtr0)/2.d0
-          !Ikdiag   = (real(Ikgtr(istep+1))-real(Ikless(istep+1)) + Ikdiag)/2.d0
-          Ikdiag   = (-2.d0*real(Ikless(istep+1),8) + Ikdiag)/2.d0
+          Ikdiag   = (dreal(Ikgtr(istep+1))-dreal(Ikless(istep+1)) + Ikdiag)/2.d0
+          !Ikdiag   = (-2.d0*real(Ikless(istep+1),8) + Ikdiag)/2.d0
        end select
 
        !Evolve the solution of KB equations for all the k-points:
@@ -352,7 +352,7 @@ contains
     real(8) :: arg
     arg=Hbar(ik,istep)
     VdeltaF=exp(-xi*arg*dt)
-    if(abs(arg*dt) <= 1.d-9)then
+    if(abs(arg*dt) <= 1.d-5)then
        VdeltaF=xi*dt
     else
        VdeltaF=(1.d0-VdeltaF)/arg
@@ -576,7 +576,7 @@ contains
     real(8),dimension(0:nstep)      :: nt,modJloc             !occupation(time)
     if(mpiID==0)then
 
-       call write_keldysh_contour_gf(locG,trim(data_dir)//"/locG")
+       !call write_keldysh_contour_gf(locG,trim(data_dir)//"/locG")
        call store_data(trim(data_dir)//"/nk.data",nk(0:,:))
 
        if(plot3D)then
