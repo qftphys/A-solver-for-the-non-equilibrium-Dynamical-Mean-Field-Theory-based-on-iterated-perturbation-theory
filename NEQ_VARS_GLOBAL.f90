@@ -1,5 +1,4 @@
 !#####################################################################
-!     Program  : VARS_GLOBAL
 !     PURPOSE  : Defines the global variables used thru all the code
 !     AUTHORS  : Adriano Amaricci
 !#####################################################################
@@ -47,8 +46,7 @@
 !  P=[5]                    -- Uniform Power mesh power-mesh parameter
 !  Q=[5]                    -- Uniform Power mesh uniform-mesh parameter
 !  eps=[0.05d0]             -- Broadening on the real-axis
-!  Nx=[50]                  -- Number of k-points along x-axis 
-!  Ny=[50]                  -- Number of k-points along y-axis 
+!  Nx=[50]                  -- Size of the K-points grid
 !  solve_wfftw =[F]         -- 
 !  plot3D=[F]       -- 
 !  Lkreduced=[200]  -- 
@@ -56,7 +54,7 @@
 !  irdSFILE=[restartSigma]-- 
 !  irdNkFILE=[restartNk]-- 
 !#####################################################################
-MODULE VARS_GLOBAL
+MODULE NEQ_VARS_GLOBAL
   !Local:
   USE CONTOUR_GF
   !SciFor library
@@ -73,7 +71,6 @@ MODULE VARS_GLOBAL
   USE FUNCTIONS
   USE INTERPOLATE
   USE TOOLS
-  USE MPI
   implicit none
 
   !Version revision
@@ -86,11 +83,11 @@ MODULE VARS_GLOBAL
   integer                                :: Ltau          !Imaginary time slices
   integer                                :: Lk            !total lattice  dimension
   integer                                :: Lkreduced     !reduced lattice dimension
-  integer                                :: Nx,Ny         !lattice grid dimensions
+  integer                                :: Nx            !lattice grid dimensions
   integer                                :: iloop,nloop    !dmft loop variables
   integer                                :: eqnloop        !dmft loop of the equilibrium solution
   real(8)                                :: ts             !n.n./n.n.n. hopping amplitude
-  real(8)                                :: u              !local,non-local interaction 
+  real(8)                                :: U              !local,non-local interaction 
   real(8)                                :: Vbath          !Hopping amplitude to the BATH
   real(8)                                :: Wbath          !Width of the BATH DOS
   real(8)                                :: dt,dtau        !time step
@@ -108,7 +105,7 @@ MODULE VARS_GLOBAL
   real(8)                                :: Walpha         !exponent of the pseudo-gapped bath.
   real(8)                                :: Wgap          !gap of the gapped bath
   logical                                :: plot3D,fchi
-  logical                                :: solve_eq
+  !logical                                :: solve_eq
   integer                                :: fupdate !flag to decide WFupdate procedure
   !
 
@@ -119,7 +116,7 @@ MODULE VARS_GLOBAL
 
   !FREQS & TIME ARRAYS:
   !=========================================================  
-  real(8),dimension(:),allocatable       :: wr,t,wm
+  real(8),dimension(:),allocatable       :: wr,time,wm
   real(8),dimension(:),allocatable       :: tau
 
 
@@ -209,14 +206,13 @@ MODULE VARS_GLOBAL
        E1           ,& 
                                 !K-GRID
        Nx           ,& 
-       Ny           ,& 
                                 !CONVERGENCE:
        eps_error    ,& 
        nsuccess     ,& 
        weight       ,& 
                                 !FLAGS:
        int_method   ,& 
-       solve_eq     ,& 
+                                ! solve_eq     ,& 
        plot3D       ,& 
        fchi         ,& 
        fupdate      ,&
@@ -274,14 +270,13 @@ contains
     E1           = 0.d0
     !K-GRID
     Nx           = 25
-    Ny           = 25
     !CONVERGENCE:
     eps_error    = 1.d-4
     nsuccess     = 2
     weight       = 1.d0
     !FLAGS:
     int_method   = 'trapz'
-    solve_eq     = .false. 
+    ! solve_eq     = .false. 
     plot3D       = .false.
     fchi         = .false.
     fupdate      = 0
@@ -338,10 +333,9 @@ contains
     call parse_cmd_variable(weight       ,"WEIGHT")
     !GRID k-POINTS:
     call parse_cmd_variable(Nx           ,"NX")
-    call parse_cmd_variable(Ny           ,"NY")
     !FLAGS:
     call parse_cmd_variable(int_method   ,"INT_METHOD")
-    call parse_cmd_variable(solve_eq     ,"SOLVE_EQ")
+    ! call parse_cmd_variable(solve_eq     ,"SOLVE_EQ")
     call parse_cmd_variable(plot3D       ,"PLOT3D")
     call parse_cmd_variable(fchi         ,"FCHI")
     call parse_cmd_variable(fupdate      ,"FUPDATE")
@@ -374,6 +368,10 @@ contains
       endif
     end subroutine dump_input_file
   end subroutine read_input_init
+
+
+
+
   !******************************************************************
   !******************************************************************
   !******************************************************************
@@ -398,14 +396,15 @@ contains
     !Bath self-energies:
     call allocate_keldysh_contour_gf(S0,Nstep)
     !Momentum-distribution:
-    allocate(nk(0:nstep,Lk),eq_nk(Lk))
-    !Equilibrium/Wigner rotated Green's function
-    call allocate_gf(gf0,nstep)
-    call allocate_gf(gf,nstep)
-    call allocate_gf(sf,nstep)
+    allocate(nk(Nstep,Lk),eq_nk(Lk))
 
-    !Susceptibility/Optical response
-    if(fchi)allocate(chi(2,2,0:nstep,0:nstep))
+    ! !Equilibrium/Wigner rotated Green's function
+    ! call allocate_gf(gf0,nstep)
+    ! call allocate_gf(gf,nstep)
+    ! call allocate_gf(sf,nstep)
+
+    !susceptibility/Optical response
+    if(fchi)allocate(chi(2,2,Nstep,Nstep))
     !Other:
     allocate(exa(-nstep:nstep))
     ex=-1.d0       
@@ -420,5 +419,63 @@ contains
   !******************************************************************
 
 
-end module VARS_GLOBAL
+
+
+  !+-------------------------------------------------------------------+
+  !PURPOSE  : Initialize the run guessing/reading self-energy
+  !+-------------------------------------------------------------------+
+  subroutine read_initial_self()
+    logical :: init,checknk
+    integer :: i,j,ik
+
+    init = inquire_keldysh_contour_gf(reg(irdSFILE))
+    if(init)then
+       call msg(bold("Reading components of the input Self-energy and nk"))
+       call read_keldysh_contour_gf(Sigma,reg(irdSFILE))
+    else
+       call msg(bold("Start from the Hartree-Fock self-energy"))
+       Sigma=zero
+    endif
+
+    inquire(file=reg(irdnkfile),exist=checkNk)
+    if(.not.checkNk)inquire(file=reg(irdNkfile)//".gz",exist=checkNk)
+    if(checkNk)then
+       call read_nkfile(eq_nk,trim(irdnkfile))
+    else
+       !Get non-interacting n(k):
+       do ik=1,Lk
+          eq_nk(ik)=fermi((epsik(ik)),beta)
+       enddo
+    endif
+    call splot("ic_nkVSepsk.ipt",epsik,eq_nk)
+
+  contains
+    subroutine read_nkfile(irdnk,file)
+      character(len=*)     :: file
+      real(8),dimension(Lk):: irdnk
+      integer              :: redLk
+      real(8),allocatable  :: rednk(:),redek(:)
+      integer,allocatable  :: orderk(:)
+      real(8),allocatable  :: uniq_rednk(:),uniq_redek(:)
+      logical,allocatable  :: maskk(:)
+      !n(k): A lot of work here to reshape the array
+      redLk=file_length(file)
+      allocate(rednk(redLk),redek(redLk),orderk(redLk))
+      call sread(file,redek,rednk)
+      !work on the read arrays:
+      !1 - sorting: sort the energies (X-axis), mirror on occupation (Y-axis) 
+      !2 - delete duplicates energies (X-axis), mirror on occupation (Y-axis) 
+      !3 - interpolate to the actual lattice structure (epsik,nk)
+      call sort_array(redek,orderk)
+      call reshuffle(rednk,orderk)
+      call uniq(redek,uniq_redek,maskk)
+      allocate(uniq_rednk(size(uniq_redek)))
+      uniq_rednk = pack(rednk,maskk)
+      call linear_spline(uniq_rednk,uniq_redek,irdnk,epsik)
+    end subroutine read_nkfile
+  end subroutine read_initial_self
+
+
+
+end module NEQ_VARS_GLOBAL
 

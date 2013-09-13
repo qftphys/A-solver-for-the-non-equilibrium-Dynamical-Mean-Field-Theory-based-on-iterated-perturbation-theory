@@ -1,18 +1,14 @@
 !#####################################################################
-!     Program  : ELECTRIC_FIELD
-!     TYPE     : Module
 !     PURPOSE  : Function for the Electric field vector potential
 !     AUTHORS  : Adriano Amaricci
 !#####################################################################
 MODULE ELECTRIC_FIELD
-  USE VARS_GLOBAL
+  USE NEQ_VARS_GLOBAL
   implicit none
   private
-
   public :: Afield
   public :: set_efield_vector
-
-
+  public :: print_field
 contains
 
   !+------------------------------------------------------------+
@@ -39,7 +35,6 @@ contains
          field_type=="pulse".OR.&
          field_type=="ramp"
     if(.not.check)call error("ELECTRIC_FIELD/Afield: wrong field_type. set:dc,ac,acdc,pulse,ramp")
-    if(mpiID==0)call print_Afield_form(t(0:nstep))
   end subroutine set_efield_vector
 
 
@@ -91,21 +86,10 @@ contains
        !!add more here:
     end select
     !-----------------------------
-
-
   end function Afield
 
 
-
-  !***************************************************************
-  !***************************************************************
-  !***************************************************************
-
-
-
-
-
-  subroutine print_Afield_form(t)
+  subroutine print_field(t)
     real(8),dimension(:) :: t
     integer              :: i
     type(vect2D)         :: A
@@ -126,7 +110,7 @@ contains
     close(10)
     close(11)
     if(field_type=="ac")call msg("Root condition: "//trim(txtfy(bessel_j0(Efield/Omega0))))
-  end subroutine print_Afield_form
+  end subroutine print_field
 
 
   !***************************************************************

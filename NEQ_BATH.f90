@@ -1,13 +1,12 @@
 !###############################################################
-!     PROGRAM  : BATH
+!     PROGRAM  : BUILD THERMOSTATING BATHS
 !     AUTHORS  : Adriano Amaricci
-!     LAST UPDATE: 07/2009
 !###############################################################
-module BATH
-  USE VARS_GLOBAL
+module NEQ_BATH
+  USE NEQ_VARS_GLOBAL
   implicit none
   private
-  integer                          :: Lw!=2048 !# of frequencies
+  integer                          :: Lw
   real(8),allocatable,dimension(:) :: bath_dens,wfreq
 
   public                           :: get_thermostat_bath
@@ -23,20 +22,20 @@ contains
     real(8)          :: en,w,dw,wfin,wini
     complex(8)       :: peso
     real(8)          :: ngtr,nless,arg,lambda
+    complex(8)       ::  S0gtr(Nstep,Nstep)
     ! complex(8)       :: s0less_w(Lw),s0less_t(-Lw/2:Lw/2)
     ! complex(8)       :: s0gtr_w(Lw),s0gtr_t(-Lw/2:Lw/2)
-    call msg("Get Bath. Type: "//bold_green(reg(bath_type))//" dissipative bath",id=0)
+    call msg("Get Bath Type: "//reg(bath_type),id=0)
     call msg("Bath coupling is:"//txtfy(Vbath))
     call msg("Bath width is:"//txtfy(2.d0*Wbath))
     lambda=Vbath*2.d0*Wbath
     call msg("Bath coupling amplitude is:"//txtfy(lambda))
-    !call create_data_dir("Bath")
     Lw=L
     allocate(bath_dens(Lw),wfreq(Lw))
     wfin  = 2.d0*Wbath ; wini=-wfin
     wfreq = linspace(wini,wfin,Lw,mesh=dw)
 
-    select case(trim(adjustl(trim(bath_type))))
+    select case(reg(bath_type))
     case("bethe")
        call get_bath_bethe_dos()
 
@@ -60,41 +59,31 @@ contains
     end select
 
     S0=zero
+    S0gtr=zero
     if(Vbath/=0.d0)then
-       ! s0less_w = pi2*xi*fermi(wfreq,beta)*bath_dens
-       ! s0gtr_w  = pi2*xi*(fermi(wfreq,beta)-1.d0)*bath_dens
-       ! call fftgf_rw2rt(s0less_w,s0less_t,Lw);   s0less_t=xi*dw*s0less_t
-       ! call fftgf_rw2rt(s0gtr_w ,s0gtr_t ,Lw);   s0gtr_t =xi*dw*s0gtr_t
-       ! forall(i=0:nstep,j=0:nstep)
-       !    S0%less(i,j)=s0less_t(i-j)
-       !    S0%gtr(i,j)=s0gtr_t(i-j)
-       ! end forall
        do iw=1,Lw
           en   = wfreq(iw)
           nless= fermi(en,beta)
           ngtr = fermi(en,beta)-1.d0 !it absorbs the minus sign of the greater functions
-          do i=0,nstep
-             do j=0,nstep
-                peso=exp(-xi*(t(i)-t(j))*en)
+          do i=1,nstep
+             do j=1,nstep
+                peso=exp(-xi*(time(i)-time(j))*en)
                 S0%less(i,j)=S0%less(i,j)+ xi*lambda*nless*peso*bath_dens(iw)*dw
-                S0%gtr(i,j) =S0%gtr(i,j) + xi*lambda*ngtr*peso*bath_dens(iw)*dw
+                S0gtr(i,j) =S0gtr(i,j)   + xi*lambda*ngtr*peso*bath_dens(iw)*dw
              enddo
           enddo
        enddo
+       forall(i=1:Nstep,j=1:Nstep)S0%ret(i,j) = step(time(i)-time(j))*(S0gtr(i,j)-S0%less(i,j))
     endif
 
     if(mpiID==0)then
        call splot("DOSbath.lattice",wfreq,bath_dens,append=.true.)
-       if(Vbath/=0.d0.AND.plot3D)call plot_keldysh_contour_gf(S0,t(0:),"S0")
+       if(Vbath/=0.d0.AND.plot3D)call plot_keldysh_contour_gf(S0,time,reg(plot_dir)//"/S0")
     endif
 
   end subroutine get_thermostat_bath
 
 
-
-  !********************************************************************
-  !********************************************************************
-  !********************************************************************
 
 
   !+-----------------------------------------------------------------+
@@ -173,5 +162,5 @@ contains
 
 
 
-end module BATH
+end module NEQ_BATH
 

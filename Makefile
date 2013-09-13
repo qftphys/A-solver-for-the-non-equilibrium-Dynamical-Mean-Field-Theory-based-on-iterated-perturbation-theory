@@ -1,19 +1,20 @@
 #=========================================================================
 include sfmake.inc
 #=========================================================================
-FC=$(SFMPI)/mpif90
+FC=ifort
 EXE   = neqDMFT
 DIR=./drivers
 DIREXE= $(HOME)/.bin
 BRANCH= $(shell git rev-parse --abbrev-ref HEAD)
 
-OBJS =  CONTOUR_GF.o VARS_GLOBAL.o ELECTRIC_FIELD.o BATH.o EQUILIBRIUM.o IPT_NEQ.o UPDATE_WF.o KADANOFBAYM.o RESULTS.o
+OBJS =  VIDE_RK24.o CONTOUR_GF.o NEQ_VARS_GLOBAL.o ELECTRIC_FIELD.o NEQ_BATH.o NEQ_IPT.o NEQ_UPDATE_WF.o NEQ_KADANOFF_BAYM.o NEQ_RESULTS.o
 
 
 FLAG=$(STD)
-#FLAG=$(DEB)
 #FLAG=$(OPT)
 ARGS= $(SFLIBS)
+
+#FLAG=$(DEB)
 #ARGS= $(SFLIBS_DEB)
 
 
