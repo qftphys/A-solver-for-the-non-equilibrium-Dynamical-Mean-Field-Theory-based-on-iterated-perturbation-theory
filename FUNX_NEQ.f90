@@ -7,7 +7,7 @@ module FUNX_NEQ
   USE VARS_GLOBAL
   USE ELECTRIC_FIELD
   USE BATH
-  USE EQUILIBRIUM
+  !USE EQUILIBRIUM
   implicit none
   private
 
@@ -86,9 +86,9 @@ contains
              Jloc(i) = Jloc(i) +  wt(ik)*Jk
           enddo
        enddo
-       call splot("nVStime.ipt",t(0:nstep),2.d0*nt(0:nstep),append=TT)
+       call splot("nVStime.ipt",t(0:nstep),2.d0*nt(0:nstep),append=.true.)
        modJloc(0:nstep)=modulo(Jloc(0:nstep))
-       call splot("JlocVStime.ipt",t(0:nstep),Jloc(0:nstep)%x,Jloc(0:nstep)%y,append=TT)
+       call splot("JlocVStime.ipt",t(0:nstep),Jloc(0:nstep)%x,Jloc(0:nstep)%y,append=.true.)
     endif
   end subroutine print_observables
 

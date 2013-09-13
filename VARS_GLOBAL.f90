@@ -9,13 +9,15 @@ MODULE VARS_GLOBAL
   USE CONTOUR_GF
   !SciFor library
   USE COMMON_VARS
+  USE PARSE_CMD
   USE GREENFUNX
   USE TIMER
   USE VECTORS
   USE SQUARE_LATTICE
+  USE FUNCTIONS
   USE IOTOOLS
   USE FFTGF
-  USE SPLINE
+  USE INTERPOLATE
   USE TOOLS
   USE MPI
   implicit none
@@ -31,6 +33,15 @@ MODULE VARS_GLOBAL
   integer           :: Lk            !total lattice  dimension
   integer           :: Lkreduced     !reduced lattice dimension
   integer           :: Nx,Ny         !lattice grid dimensions
+integer                                :: iloop,nloop    !dmft loop variables
+  integer                                :: eqnloop        !dmft loop of the equilibrium solution
+  real(8)                                :: ts,xmu             !n.n./n.n.n. hopping amplitude
+  real(8)                                :: u              !local,non-local interaction 
+  real(8)                                :: Vpd          !Hopping amplitude to the BATH
+  real(8)                                :: dt,dtau        !time step
+  real(8)                                :: fmesh          !freq. step
+  real(8)                                :: beta           !inverse temperature
+  real(8)                                :: eps            !broadening
   integer           :: nstep         !Number of Time steps
   real(8)           :: beta0,xmu0,U0 !quench variables
   logical           :: iquench       !quench flag
@@ -157,72 +168,6 @@ contains
     lprint=.false. ; if(present(printf))lprint=printf
     call version(revision)
 
-    allocate(help_buffer(60))
-    help_buffer=([&
-         'NAME',&
-         '  neqDMFT',&
-         '',&
-         'DESCRIPTION',&
-         '  Run the non-equilibrium DMFT in presence of an external electric field E. ',&
-         '  The field is controlled by few flags in the nml/cmd options. It can be ',&
-         '  constant, pulse or switched off smoothly. Many more fields can be added by  ',&
-         '  simply coding them in ELECTRIC_FIELD.f90. The executable read the file',&
-         '  *inputFILE.ipt, if not found dump default values to a defualt file.',&
-         '  ',&
-         '  The output consist of very few data files that contain all the information,',&
-         '  these are eventually read by a second program *get_data_neqDMFT to extract ',&
-         '  all the relevant information.',&
-         ' ',&
-         '  In this version the impurity solver is: IPT',&
-         ' ',&
-         'OPTIONS',&
-         ' dt=[0.157080]            -- Time step for solution of KB equations',&
-         ' beta=[100.0]             -- Inverse temperature ',&
-         ' U=[6]                    -- Hubbard local interaction value',&
-         ' Efield=[0]               -- Strenght of the electric field',&
-         ' Vpd=[0]                  -- Strenght of the coupling to bath (Lambda=Vpd^2/Wbath)',&
-         ' ts=[1]                   -- Hopping parameter',&
-         ' nstep=[50]               -- Number of time steps: T_max = dt*nstep',&
-         ' nloop=[30]               -- Maximum number of DMFT loops allowed (then exit)',&
-         ' eps_error=[1.d-4]        -- Tolerance on convergence',&
-         ' weight=[0.9]             -- Mixing parameter',&
-         ' Nsuccess =[2]            -- Number of consecutive success for convergence to be true',&
-         ' Ex=[1]                   -- X-component of the Electric field vector',&
-         ' Ey=[1]                   -- Y-component of the Electric field vector',&
-         ' t0=[0]                   -- Switching on time parameter for the Electric field',&
-         ' t1=[10^6]                -- Switching off time parameter for the Electric field',&
-         ' tau0=[1]                 -- Width of gaussian packect envelope for the impulsive Electric field',&
-         ' w0=[20]                  -- Frequency of the of the impulsive Electric field',&
-         ' omega0=[pi/4]            -- Frequency of the of the Oscillating Electric field',&        
-         ' E1=[1]                   -- Strenght of the electric field for the AC+DC case, to be tuned to resonate',&        
-         ' field_profile=[constant] -- Type of electric field profile (constant,gaussian,ramp)',&
-         ' irdeq=[F]        -- ',&
-         ' method=[ipt]     -- ',&
-         ' update_wfftw=[F] -- ',&
-         ' solve_wfftw =[F] -- ',&
-         ' plotVF=[F]       -- ',&
-         ' plot3D=[F]       -- ',&
-         ' data_dir=[DATAneq]       -- ',&
-         ' fchi=[F]         -- ',&
-         ' equench=[F]      -- ',&
-         ' L=[1024]         -- ',&
-         ' Ltau=[32]        -- ',&
-         ' Lmu=[2048]       -- ',&
-         ' Lkreduced=[200]  -- ',&
-         ' wbath=[10.0]     -- ',&
-         ' bath_type=[constant] -- ',&
-         ' eps=[0.05d0]         -- ',&
-         ' irdG0wfile=[eqG0w.restart]-- ',&
-         ' irdnkfile =[eqnk.restart]-- ',&
-         ' irdSfile=[Sigma.restart]-- ',&
-         ' Nx=[50]      -- ',&
-         ' Ny=[50]      -- ',&    
-         ' iquench=[F]  -- ',&
-         ' beta0=[100]  -- ',&
-         ' U0=[6]       -- ',&
-         ' xmu0=[0]     -- ',& 
-         '  '])
-    call parse_cmd_help(help_buffer)
 
     !     Variables:
     dt            = 0.157080

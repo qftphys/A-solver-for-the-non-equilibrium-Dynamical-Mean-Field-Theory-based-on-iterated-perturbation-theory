@@ -129,8 +129,8 @@ contains
     N=G%N+1
     if( (size(G%less)/=N**2) .OR. (size(G%gtr)/=N**2) )&
          call error("ERROR contour_gf/write_keldysh_contour_gf: wrong dimensions")
-    call splot(trim(file)//"_less.data",G%less(0:,0:))
-    call splot(trim(file)//"_gtr.data",G%gtr(0:,0:))
+    call store_data(trim(file)//"_less.data",G%less(0:,0:))
+    call store_data(trim(file)//"_gtr.data",G%gtr(0:,0:))
   end subroutine write_keldysh_contour_gf
 
   !******************************************************************
@@ -144,8 +144,8 @@ contains
     N=G%N+1
     if( (size(G%less)/=N**2) .OR. (size(G%gtr)/=N**2) )&
          call error("ERROR contour_gf/write_keldysh_contour_gf: wrong dimensions")
-    call sread(trim(file)//"_less.data",G%less(0:,0:))
-    call sread(trim(file)//"_gtr.data",G%gtr(0:,0:))
+    call read_data(trim(file)//"_less.data",G%less(0:,0:))
+    call read_data(trim(file)//"_gtr.data",G%gtr(0:,0:))
   end subroutine read_keldysh_contour_gf
 
   function inquire_keldysh_contour_gf(file) result(check)
@@ -172,8 +172,8 @@ contains
     N=G%N+1
     if( (size(G%less)/=N**2) .OR. (size(G%gtr)/=N**2) )&
          call error("ERROR contour_gf/plot_keldysh_contour_gf: wrong dimensions")
-    call splot(reg_filename(file)//"_less_t_t",t(0:),t(0:),G%less(0:,0:))
-    call splot(reg_filename(file)//"_gtr_t_t",t(0:),t(0:),G%gtr(0:,0:))
+    call splot3d(trim(file)//"_less_t_t",t(0:),t(0:),G%less(0:,0:))
+    call splot3d(trim(file)//"_gtr_t_t",t(0:),t(0:),G%gtr(0:,0:))
   end subroutine plot_keldysh_contour_gf
 
   !******************************************************************
@@ -330,11 +330,11 @@ contains
          call error("ERROR contour_gf/write_kbm_contour_gf: wrong dimensions 2")
     if( size(G%mats)/=L*L)&
          call error("ERROR contour_gf/write_kbm_contour_gf: wrong dimensions 3")
-    call splot(trim(file)//"_less.data",G%less(0:,0:))
-    call splot(trim(file)//"_gtr.data",G%gtr(0:,0:))
-    call splot(trim(file)//"_lmix.data",G%lmix(0:,0:))
-    call splot(trim(file)//"_gmix.data",G%gmix(0:,0:))
-    call splot(trim(file)//"_mats.data",G%mats(0:,0:))
+    call store_data(trim(file)//"_less.data",G%less(0:,0:))
+    call store_data(trim(file)//"_gtr.data",G%gtr(0:,0:))
+    call store_data(trim(file)//"_lmix.data",G%lmix(0:,0:))
+    call store_data(trim(file)//"_gmix.data",G%gmix(0:,0:))
+    call store_data(trim(file)//"_mats.data",G%mats(0:,0:))
   end subroutine write_kbm_contour_gf
 
   !******************************************************************
@@ -352,11 +352,11 @@ contains
          call error("ERROR contour_gf/write_kbm_contour_gf: wrong dimensions 2")
     if( size(G%mats)/=L*L)&
          call error("ERROR contour_gf/write_kbm_contour_gf: wrong dimensions 3")
-    call sread(trim(file)//"_less.data",G%less(0:,0:))
-    call sread(trim(file)//"_gtr.data",G%gtr(0:,0:))
-    call sread(trim(file)//"_lmix.data",G%lmix(0:,0:))
-    call sread(trim(file)//"_gmix.data",G%gmix(0:,0:))
-    call sread(trim(file)//"_mats.data",G%mats(0:,0:))
+    call read_data(trim(file)//"_less.data",G%less(0:,0:))
+    call read_data(trim(file)//"_gtr.data",G%gtr(0:,0:))
+    call read_data(trim(file)//"_lmix.data",G%lmix(0:,0:))
+    call read_data(trim(file)//"_gmix.data",G%gmix(0:,0:))
+    call read_data(trim(file)//"_mats.data",G%mats(0:,0:))
   end subroutine read_kbm_contour_gf
 
   !******************************************************************
@@ -375,11 +375,11 @@ contains
          call error("ERROR contour_gf/plot_kbm_contour_gf: wrong dimensions 2")
     if( size(G%mats)/=L*L)&
          call error("ERROR contour_gf/plot_kbm_contour_gf: wrong dimensions 3")
-    call splot(reg_filename(file)//"_less_t_t",t(0:),t(0:),G%less(0:,0:))
-    call splot(reg_filename(file)//"_gtr_t_t",t(0:),t(0:),G%gtr(0:,0:))
-    call splot(reg_filename(file)//"_lmix_t_tau",t(0:),tau(0:),G%lmix(0:,0:))
-    call splot(reg_filename(file)//"_gmix_tau_t",tau(0:),t(0:),G%gmix(0:,0:))
-    call splot(reg_filename(file)//"_mats_tau_tau",tau(0:),tau(0:),G%mats(0:,0:))
+    call splot3d(trim(file)//"_less_t_t",t(0:),t(0:),G%less(0:,0:))
+    call splot3d(trim(file)//"_gtr_t_t",t(0:),t(0:),G%gtr(0:,0:))
+    call splot3d(trim(file)//"_lmix_t_tau",t(0:),tau(0:),G%lmix(0:,0:))
+    call splot3d(trim(file)//"_gmix_tau_t",tau(0:),t(0:),G%gmix(0:,0:))
+    call splot3d(trim(file)//"_mats_tau_tau",tau(0:),tau(0:),G%mats(0:,0:))
   end subroutine plot_kbm_contour_gf
 
   !******************************************************************

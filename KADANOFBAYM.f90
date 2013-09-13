@@ -9,7 +9,7 @@ module KADANOFBAYM
   !LOCAL:
   USE VARS_GLOBAL
   USE ELECTRIC_FIELD
-  USE EQUILIBRIUM
+  !USE EQUILIBRIUM
   USE FUNX_NEQ
   implicit none
   private
@@ -615,7 +615,7 @@ contains
           call write_keldysh_contour_gf(locG1,reg_filename(data_dir)//"/locG1")
           call write_keldysh_contour_gf(locG2,reg_filename(data_dir)//"/locG2")
        endif
-       call splot(reg_filename(data_dir)//"/nk.data",nk(0:,:))
+       call store_data(reg_filename(data_dir)//"/nk.data",nk(0:,:))
 
        if(plot3D)then
           call plot_keldysh_contour_gf(locG,t(0:),"PLOT/locG")
@@ -632,24 +632,24 @@ contains
        end forall
        !if(heaviside(0.d0)==1.d0)gf%ret%t(0)=gf%ret%t(0)/2.d0
        call fftgf_rt2rw(gf%ret%t,gf%ret%w,nstep) ;  gf%ret%w=gf%ret%w*dt ; call swap_fftrt2rw(gf%ret%w)
-       call splot("locGless_t.ipt",t,gf%less%t,append=TT)
-       call splot("locGgtr_t.ipt",t,gf%gtr%t,append=TT)
-       call splot("locGret_t.ipt",t,gf%ret%t,append=TT)
-       call splot("locGret_realw.ipt",wr,gf%ret%w,append=TT)
-       call splot("locDOS.ipt",wr,-aimag(gf%ret%w)/pi,append=TT)
+       call splot("locGless_t.ipt",t,gf%less%t,append=.true.)
+       call splot("locGgtr_t.ipt",t,gf%gtr%t,append=.true.)
+       call splot("locGret_t.ipt",t,gf%ret%t,append=.true.)
+       call splot("locGret_realw.ipt",wr,gf%ret%w,append=.true.)
+       call splot("locDOS.ipt",wr,-aimag(gf%ret%w)/pi,append=.true.)
 
-       if(fchi)then
-          call splot(reg_filename(data_dir)//"/locChi_11.data",chi(1,1,0:,0:))
-          call splot(reg_filename(data_dir)//"/locChi_12.data",chi(1,2,0:,0:))
-          call splot(reg_filename(data_dir)//"/locChi_21.data",chi(2,1,0:,0:))
-          call splot(reg_filename(data_dir)//"/locChi_22.data",chi(2,2,0:,0:))
-          if(plot3D)then
-             call splot("PLOT/locChi_11",t(0:),t(0:),chi(1,1,0:,0:))
-             call splot("PLOT/locChi_12",t(0:),t(0:),chi(1,2,0:,0:))
-             call splot("PLOT/locChi_21",t(0:),t(0:),chi(2,1,0:,0:))
-             call splot("PLOT/locChi_22",t(0:),t(0:),chi(2,2,0:,0:))
-          endif
-       endif
+       ! if(fchi)then
+       !    call store_data(reg_filename(data_dir)//"/locChi_11.data",chi(1,1,0:,0:))
+       !    call store_data(reg_filename(data_dir)//"/locChi_12.data",chi(1,2,0:,0:))
+       !    call splot(reg_filename(data_dir)//"/locChi_21.data",chi(2,1,0:,0:))
+       !    call splot(reg_filename(data_dir)//"/locChi_22.data",chi(2,2,0:,0:))
+       !    if(plot3D)then
+       !       call splot("PLOT/locChi_11",t(0:),t(0:),chi(1,1,0:,0:))
+       !       call splot("PLOT/locChi_12",t(0:),t(0:),chi(1,2,0:,0:))
+       !       call splot("PLOT/locChi_21",t(0:),t(0:),chi(2,1,0:,0:))
+       !       call splot("PLOT/locChi_22",t(0:),t(0:),chi(2,2,0:,0:))
+       !    endif
+       ! endif
 
     endif
   end subroutine print_out_Gloc

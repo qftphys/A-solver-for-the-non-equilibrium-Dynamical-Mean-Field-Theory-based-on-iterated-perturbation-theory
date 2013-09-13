@@ -8,7 +8,7 @@ program neqDMFT
   USE VARS_GLOBAL                 !global variables, calls to 3rd library 
   USE ELECTRIC_FIELD              !contains electric field init && routines
   USE BATH                        !contains bath inizialization
-  USE EQUILIBRIUM                 !solves the equilibrium problem w/ IPT
+  !USE EQUILIBRIUM                 !solves the equilibrium problem w/ IPT
   USE IPT_NEQ                     !performs the non-eq. IPT. Write Sigma
   USE KADANOFBAYM                 !solves KB equations numerically to get k-sum
   USE FUNX_NEQ                    !contains routines for WF update and printing.
@@ -34,7 +34,7 @@ program neqDMFT
   call global_memory_allocation !allocate functions in the memory
   call get_thermostat_bath()    !get the dissipative bath functions
 
-  if(solve_eq)call solve_equilibrium_ipt()
+  !if(solve_eq)call solve_equilibrium_ipt()
 
   call neq_init_run            !initialize the run w/ different guess.
 

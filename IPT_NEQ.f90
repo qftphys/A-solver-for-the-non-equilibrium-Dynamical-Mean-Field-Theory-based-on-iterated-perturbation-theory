@@ -4,7 +4,7 @@
 !###############################################################
 module IPT_NEQ
   USE VARS_GLOBAL
-  USE EQUILIBRIUM
+  !USE EQUILIBRIUM
   USE ELECTRIC_FIELD
   USE MATRIX
   implicit none
@@ -54,19 +54,19 @@ contains
     checkS=inquire_keldysh_contour_gf(trim(irdSfile))
 
     if(checkS)then
-       call msg("Reading self-energy guess from input file.",lines=1,id=0)
+       call msg("Reading self-energy guess from input file.",id=0)
        call read_keldysh_contour_gf(Sigma,trim(irdSfile))
 
     else  !DEFAULT: no files read, start from non-interacting HF solution or G0_loc if required       
 
        if(.not.g0loc_guess)then
           call msg("Using Hartree-Fock for self-energy guess",id=0)
-          call msg("G0less=G0gtr=zero",lines=1,id=0)
+          call msg("G0less=G0gtr=zero",id=0)
           G0=zero
 
        elseif(g0loc_guess)then
           if(equench)then
-             call msg("Using G0_loc + electric field for self-energy guess",lines=1,id=0)
+             call msg("Using G0_loc + electric field for self-energy guess",id=0)
              do ik=1,Lk
                 en   = epsik(ik)
                 nless= fermi0(en,beta)
@@ -81,7 +81,7 @@ contains
                 enddo
              enddo
           else
-             call msg("Using G0_loc for self-energy guess",lines=1,id=0)
+             call msg("Using G0_loc for self-energy guess",id=0)
              do ik=1,Lk
                 en   = epsik(ik)
                 nless= fermi0(en,beta)

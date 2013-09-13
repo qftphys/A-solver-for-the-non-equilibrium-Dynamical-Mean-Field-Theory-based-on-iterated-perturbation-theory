@@ -1,32 +1,17 @@
-FC=mpif90
+FC=/opt/mpich2/intel/bin/mpif90
 EXE   = neqDMFT
 DIREXE= $(HOME)/.bin
 
 #=========================================================================
-include lib.mk
+include sfmake.inc
 #=========================================================================
 
 .SUFFIXES: .f90 
-OBJS =  CONTOUR_GF.o VARS_GLOBAL.o ELECTRIC_FIELD.o BATH.o EQUILIBRIUM.o IPT_NEQ.o FUNX_NEQ.o KADANOFBAYM.o
-
+OBJS =  CONTOUR_GF.o VARS_GLOBAL.o ELECTRIC_FIELD.o BATH.o  IPT_NEQ.o FUNX_NEQ.o KADANOFBAYM.o
+BRANCH=  $(shell git rev-parse --abbrev-ref HEAD)
 #=================STANDARD COMPILATION====================================
-all:	FLAG=$(STD)
-	ARGS=$(LIBDMFT) $(SFMODS) $(SFLIBS)
-	BRANCH=  $(shell git rev-parse --abbrev-ref HEAD)
-all: 	compile
-
-#================OPTIMIZED COMPILATION====================================
-opt: 	FLAG=$(OPT)
-	ARGS=$(LIBDMFT) $(SFMODS) $(SFLIBS)
-	BRANCH=  $(shell git rev-parse --abbrev-ref HEAD)
-opt: 	compile
-
-#================DEBUGGIN COMPILATION=====================================
-debug:	FLAG=$(DEB)
-	ARGS=$(LIBDMFT_DEB) $(SFMODS_DEB) $(SFLIBS_DEB)
-	BRANCH=  $(shell git rev-parse --abbrev-ref HEAD)
-debug:	compile
-
+FLAG=$(STD)
+ARGS=$(SFLIBS)
 
 compile: version $(OBJS)
 	@echo " ..................... compile ........................... "
@@ -51,7 +36,7 @@ data: 	version $(OBJS)
 
 
 .f90.o:	
-	$(FC) $(FLAG) -c $< $(SFMODS) 
+	$(FC) $(FLAG) -c $< $(SFINCLUDE) 
 
 
 
@@ -60,7 +45,8 @@ clean:
 	@echo "Cleaning:"
 	@rm -f *.mod *.o *~ revision.inc
 
-
+version:
+	@echo $(VER)
 #=========================================================================
-include version.mk
+#include version.mk
 #=========================================================================
