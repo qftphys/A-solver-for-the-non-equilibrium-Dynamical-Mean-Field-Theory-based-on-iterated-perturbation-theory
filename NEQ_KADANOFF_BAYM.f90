@@ -18,7 +18,13 @@ module NEQ_KADANOFF_BAYM
   type(keldysh_contour_gf)                :: Skb
   !Chi local
   real(8),allocatable,dimension(:,:,:,:)  :: chik
-  !
+  !GF adv used in the collision integral
+  complex(8),allocatable,dimension(:)     :: Gkadv
+  !Global variables
+  integer :: kpoint
+  integer :: tstride
+  integer :: ytime
+
   public                                  :: neq_get_localgf
 
 
@@ -50,6 +56,7 @@ contains
     !Allocate k-dependent GF:
     call allocate_keldysh_contour_gf(Gk,Nstep)
     call allocate_keldysh_contour_gf(Skb,Nstep)
+    allocate(Gkadv(Nstep))
     if(fchi)allocate(chik(2,2,Nstep,Nstep))
 
     !Set to Zero GF and nk:
@@ -63,14 +70,8 @@ contains
     !=============START K-POINTS LOOP======================
     call start_progress
     do ik=1,Lk
-       Gk=zero
        call step_keldysh_contour_gf(ik) !<-- solve the dynamics here:
-       if(fchi)then
-          call get_chi(ik)
-          chi = chi + chik*wt(ik)
-       endif
-       locG%less = locG%less + Gk%less*wt(ik)
-       locG%ret  = locG%ret + Gk%ret*wt(ik)
+       if(fchi)call get_chi(ik)
        call progress(ik,Lk)
     enddo
     call stop_progress
@@ -79,6 +80,7 @@ contains
     !Deallocate module arrays:
     call deallocate_keldysh_contour_gf(Gk)
     call deallocate_keldysh_contour_gf(Skb)
+    deallocate(Gkadv)
     if(fchi)deallocate(chik)
     return 
   end subroutine kadanoff_baym_to_localgf
@@ -99,71 +101,38 @@ contains
   subroutine step_keldysh_contour_gf(ik)
     integer                     :: ik
     integer                     :: i,j
-    integer                     :: ytime
-    integer                     :: hstride
-    integer                     :: Lret
     complex(8)                  :: gless0
-    complex(8),dimension(Nstep) :: Hk,QkRet,QkLess
 
-    Qkret=zero
+    !Set the k-point index
+    kpoint=ik
+
+    Gk=zero
 
     !SOLVE RETARDED COMPONENT:
-    do ytime=1,Nstep
-       hstride=ytime-1 ; Lret=Nstep-hstride
-       forall(i=1:Lret)Hk(i) = -xi*Hamkt(ik,i,hstride)
-       call vide_rk2(dt,Gk%ret(ytime:Nstep,ytime),-xi,Hk,QkRet,-xi*Skb%ret(ytime:Nstep,ytime:Nstep))
+    do ytime=1,Nstep            !<-- loop over ytime global var
+       tstride=ytime-1          !<-- enters in Hamkt
+       call vide_rk2(dt,Gk%ret(ytime:Nstep,ytime),-xi,Hamkt,Qkret,Skernel)
     enddo
+    locG%ret  = locG%ret + Gk%ret*wt(ik)
+
 
     !SOLVE LESS COMPONENT:
-    forall(i=1:Nstep)Hk(i) = -xi*Hamkt(ik,i,0)
+    tstride= 0                  !<-- enters in Hamkt
     ytime  = 1
-    gless0 =  xi*eq_nk(ik)
-    Qkless = -xi*Icollision_less(ytime)
-    call vide_rk2(dt,Gk%less(:,ytime),gless0,Hk,Qkless,-xi*Skb%ret)
-    do ytime=2,Nstep
-       gless0 = -conjg(Gk%less(ytime,1))
-       Qkless = -xi*Icollision_less(ytime)
-       call vide_rk2(dt,GK%less(:,ytime),gless0,Hk,Qkless,-xi*Skb%ret)
+    gless0 =  xi*eq_nk(ik)      !<-- initial conditions
+    Gkadv  = conjg(Gk%ret(ytime,:))
+    call vide_rk2(dt,Gk%less(:,ytime),gless0,Hamkt,Qkless,Skernel)
+    do ytime=2,Nstep            !<-- loop over ytime global var
+       gless0 = -conjg(Gk%less(ytime,1)) 
+       Gkadv  = conjg(Gk%ret(ytime,:))
+       call vide_rk2(dt,GK%less(:,ytime),gless0,Hamkt,Qkless,Skernel)
     enddo
+    locG%less = locG%less + Gk%less*wt(ik)
 
     !STORE N(K,T) DISTRIBUTION
     forall(i=1:Nstep)nk(i,ik)=-xi*Gk%less(i,i)
+
   end subroutine step_keldysh_contour_gf
-
-
-
-
-  !+-------------------------------------------------------------------+
-  !PURPOSE  : Evaluate the collision integrals along the whole line t=1:Nt
-  ! for t`= ytime
-  !+-------------------------------------------------------------------+
-  function Icollision_less(ytime) result(Ik)
-    integer                     :: ytime
-    integer                     :: i
-    complex(8),dimension(Nstep) :: Ik
-    complex(8),dimension(Nstep) :: gkadv
-    ! Ik = \int_0^{t'=ytime} S^<*Gk^A
-    gkadv =  conjg(Gk%ret(ytime,:))
-    select case(int_method)
-    case default
-       do i=1,Nstep
-          Ik(i) = trapz(dt,Skb%less(i,1:ytime)*gkadv(1:ytime))
-       enddo
-    case ("simps")
-       do i=1,Nstep
-          Ik(i) = simps(dt,Skb%less(i,1:ytime)*gkadv(1:ytime))
-       enddo
-    case ("rect")
-       do i=1,Nstep
-          Ik(i) = sum(Skb%less(i,1:ytime)*gkadv(1:ytime))*dt
-       enddo
-    end select
-  end function Icollision_less
-
-
-
-
-
 
 
 
@@ -173,20 +142,85 @@ contains
   ! argument of the interface routine, that evaluates for a given 
   ! k-points kx,ky,kz the hamiltonian value H(kx,ky,kz) where the 
   ! k-point may depend on time.
+  ! inherited variables: tstride, kpoint, ytime
   !+-------------------------------------------------------------------+
-  pure function Hamkt(ik,it,stride) result(hk)
-    integer,intent(in) :: ik,it,stride
+  function Hamkt(it)
+    integer,intent(in) :: it
     integer            :: i,j
     real(8)            :: tbar
     type(vect2D)       :: kt,Ak
-    real(8)            :: hk
-    tbar = time(it+stride)
-    i  = ik2ix(ik)
-    j  = ik2iy(ik)
+    complex(8)         :: Hamkt
+    tbar = time(it+tstride)
+    i  = ik2ix(kpoint)
+    j  = ik2iy(kpoint)
     Ak = Afield(tbar,Ek)
     kt = kgrid(i,j) - Ak
-    hk = square_lattice_dispersion(kt)
+    Hamkt = -xi*square_lattice_dispersion(kt)
   end function Hamkt
+
+
+  !+-------------------------------------------------------------------+
+  !PURPOSE  : The Retarded component of the constant term (identically zero)
+  !+-------------------------------------------------------------------+    
+  function Qkret(it)
+    integer,intent(in) :: it
+    complex(8)         :: qkret
+    qkret=zero
+  end function Qkret
+
+
+  !+-------------------------------------------------------------------+
+  !PURPOSE  : The Less component of the constant term == the collision 
+  ! integral Ik = \int_0^{t'=ytime} S^<*Gk^A
+  !+-------------------------------------------------------------------+    
+  function Qkless(it)
+    integer,intent(in) :: it
+    complex(8)         :: Qkless
+    Qkless = -xi*trapz(dt,Skb%less(it,1:ytime)*Gkadv(1:ytime))
+  end function Qkless
+
+
+  !+-------------------------------------------------------------------+
+  !PURPOSE  : The Kernel of the integro-differential equation.
+  ! this is the retarded component of the self-energy:
+  !+-------------------------------------------------------------------+    
+  function Skernel(it,is)
+    integer,intent(in) :: it,is
+    complex(8)         :: Skernel
+    Skernel=-xi*Skb%ret(it,is)
+  end function Skernel
+
+
+
+  ! !+-------------------------------------------------------------------+
+  ! !PURPOSE  : Evaluate the collision integrals along the whole line t=1:Nt
+  ! ! for t`= ytime
+  ! !+-------------------------------------------------------------------+
+  ! function Icollision_less(ytime) result(Ik)
+  !   integer                     :: ytime
+  !   integer                     :: i
+  !   complex(8),dimension(Nstep) :: Ik
+  !   complex(8),dimension(Nstep) :: gkadv
+  !   ! Ik = \int_0^{t'=ytime} S^<*Gk^A
+  !   gkadv =  conjg(Gk%ret(ytime,:))
+  !   select case(int_method)
+  !   case default
+  !      do i=1,Nstep
+  !         Ik(i) = trapz(dt,Skb%less(i,1:ytime)*gkadv(1:ytime))
+  !      enddo
+  !   case ("simps")
+  !      do i=1,Nstep
+  !         Ik(i) = simps(dt,Skb%less(i,1:ytime)*gkadv(1:ytime))
+  !      enddo
+  !   case ("rect")
+  !      do i=1,Nstep
+  !         Ik(i) = sum(Skb%less(i,1:ytime)*gkadv(1:ytime))*dt
+  !      enddo
+  !   end select
+  ! end function Icollision_less
+
+
+
 
 
 
@@ -223,6 +257,7 @@ contains
        chik(1,1,i,i)=chik(1,1,i,i) + 2.d0*ex*xi*Gk%less(i,i)
        chik(2,2,i,i)=chik(2,2,i,i) + 2.d0*ey*xi*Gk%less(i,i)
     enddo
+    chi = chi + chik*wt(ik)    
   end subroutine get_chi
 
 
