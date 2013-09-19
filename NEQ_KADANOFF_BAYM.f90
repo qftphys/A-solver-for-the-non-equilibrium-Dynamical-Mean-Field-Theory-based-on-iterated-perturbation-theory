@@ -74,6 +74,8 @@ contains
        if(fchi)call get_chi(ik)
        call progress(ik,Lk)
     enddo
+    forall(i=1:Nstep,j=1:Nstep,i>j)locG%less(i,j)=-conjg(locG%less(j,i))
+
     call stop_progress
     !=============END K-POINTS LOOP======================
 
@@ -82,7 +84,6 @@ contains
     call deallocate_keldysh_contour_gf(Skb)
     deallocate(Gkadv)
     if(fchi)deallocate(chik)
-    return 
   end subroutine kadanoff_baym_to_localgf
 
 
@@ -102,6 +103,7 @@ contains
     integer                     :: ik
     integer                     :: i,j
     complex(8)                  :: gless0
+    complex(8),dimension(Nstep) :: ick_less,gkless
 
     !Set the k-point index
     kpoint=ik
@@ -121,11 +123,13 @@ contains
     ytime  = 1
     gless0 =  xi*eq_nk(ik)      !<-- initial conditions
     Gkadv  = conjg(Gk%ret(ytime,:))
-    call vide_rk2(dt,Gk%less(:,ytime),gless0,Hamkt,Qkless,Skernel)
+    call vide_rk2(dt,gkless,gless0,Hamkt,Qkless,Skernel)
+    ick_less(1:Nstep) = -conjg(gkless)
+    Gk%less(ytime,:)  = -conjg(gkless)
     do ytime=2,Nstep            !<-- loop over ytime global var
-       gless0 = -conjg(Gk%less(ytime,1)) 
+       gless0 = ick_less(ytime)
        Gkadv  = conjg(Gk%ret(ytime,:))
-       call vide_rk2(dt,GK%less(:,ytime),gless0,Hamkt,Qkless,Skernel)
+       call vide_rk2(dt,GK%less(1:ytime,ytime),gless0,Hamkt,Qkless,Skernel)
     enddo
     locG%less = locG%less + Gk%less*wt(ik)
 
@@ -165,6 +169,10 @@ contains
   function Qkret(it)
     integer,intent(in) :: it
     complex(8)         :: qkret
+    ! if(it==1)then
+    !    qkret=-xi
+    !    return
+    ! endif
     qkret=zero
   end function Qkret
 
@@ -178,6 +186,7 @@ contains
     complex(8)         :: Qkless
     Qkless = -xi*trapz(dt,Skb%less(it,1:ytime)*Gkadv(1:ytime))
   end function Qkless
+
 
 
   !+-------------------------------------------------------------------+
