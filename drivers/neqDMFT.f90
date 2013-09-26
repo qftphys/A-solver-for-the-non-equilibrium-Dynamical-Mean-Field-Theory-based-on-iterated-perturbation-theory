@@ -66,8 +66,6 @@ program neqDMFT
   !BUILD THE  DISSIPATIVE BATH FUNCTIONS (in bath):
   call get_thermostat_bath()
 
-  ! !SOLVE THE EQUILIBRIUM PROBLEM WITH IPT (in equilibrium):
-  ! if(solve_eq)call solve_equilibrium_ipt()
 
   !START DMFT LOOP SEQUENCE:
   !==============================================================
@@ -77,23 +75,17 @@ program neqDMFT
   iloop=0;converged=.false.
   do while(.not.converged);iloop=iloop+1
      call start_loop(iloop,nloop,"DMFT-loop",unit=6)
-     !
-     call neq_get_localgf        !-|(in kadanoff-baym)
-
-     call neq_update_weiss_field !-|SELF-CONSISTENCY (in funx_neq)
-     !
-     call neq_solve_ipt          !-|IMPURITY SOLVER (in ipt_neq)
-     !
+     call neq_get_localgf        !-|                  (in neq_kadanoff-baym)
+     !if(iloop==2)stop
+     call neq_update_weiss_field !-|SELF-CONSISTENCY  (in neq_updatewf)
+     call neq_solve_ipt          !-|IMPURITY SOLVER   (in neq_ipt)
      converged = convergence_check()
-     !
      call end_loop()
   enddo
 
   !EVALUATE AND PRINT THE RESULTS OF THE CALCULATION
   call plot_results
-
   call msg("BRAVO")
-
 
 contains
 

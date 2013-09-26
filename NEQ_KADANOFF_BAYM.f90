@@ -75,7 +75,6 @@ contains
        call progress(ik,Lk)
     enddo
     forall(i=1:Nstep,j=1:Nstep,i>j)locG%less(i,j)=-conjg(locG%less(j,i))
-
     call stop_progress
     !=============END K-POINTS LOOP======================
 
@@ -103,29 +102,29 @@ contains
     integer                     :: ik
     integer                     :: i,j
     complex(8)                  :: gless0
-    complex(8),dimension(Nstep) :: ick_less,gkless
+    complex(8),dimension(Nstep) :: ick_less
 
     !Set the k-point index
     kpoint=ik
 
-    Gk=zero
+    Gk%ret =zero
+    Gk%less=zero
 
     !SOLVE RETARDED COMPONENT:
     do ytime=1,Nstep            !<-- loop over ytime global var
        tstride=ytime-1          !<-- enters in Hamkt
        call vide_rk2(dt,Gk%ret(ytime:Nstep,ytime),-xi,Hamkt,Qkret,Skernel)
     enddo
-    locG%ret  = locG%ret + Gk%ret*wt(ik)
+    locG%ret  = locG%ret + Gk%ret(:,:)*wt(ik)
 
 
     !SOLVE LESS COMPONENT:
-    tstride= 0                  !<-- enters in Hamkt
-    ytime  = 1
-    gless0 =  xi*eq_nk(ik)      !<-- initial conditions
-    Gkadv  = conjg(Gk%ret(ytime,:))
-    call vide_rk2(dt,gkless,gless0,Hamkt,Qkless,Skernel)
-    ick_less(1:Nstep) = -conjg(gkless)
-    Gk%less(ytime,:)  = -conjg(gkless)
+    tstride = 0                  !<-- enters in Hamkt
+    ytime   = 1
+    gless0  = xi*eq_nk(ik)      !<-- initial conditions
+    Gkadv   = conjg(Gk%ret(ytime,:))
+    call vide_rk2(dt,Gk%less(:,ytime),gless0,Hamkt,Qkless,Skernel)
+    ick_less= -conjg(Gk%less(:,ytime))
     do ytime=2,Nstep            !<-- loop over ytime global var
        gless0 = ick_less(ytime)
        Gkadv  = conjg(Gk%ret(ytime,:))
@@ -135,7 +134,6 @@ contains
 
     !STORE N(K,T) DISTRIBUTION
     forall(i=1:Nstep)nk(i,ik)=-xi*Gk%less(i,i)
-
   end subroutine step_keldysh_contour_gf
 
 
@@ -148,18 +146,18 @@ contains
   ! k-point may depend on time.
   ! inherited variables: tstride, kpoint, ytime
   !+-------------------------------------------------------------------+
-  function Hamkt(it)
+  function Hamkt(it) result(hkt)
     integer,intent(in) :: it
     integer            :: i,j
     real(8)            :: tbar
     type(vect2D)       :: kt,Ak
-    complex(8)         :: Hamkt
+    complex(8)         :: Hkt
     tbar = time(it+tstride)
-    i  = ik2ix(kpoint)
-    j  = ik2iy(kpoint)
-    Ak = Afield(tbar,Ek)
-    kt = kgrid(i,j) - Ak
-    Hamkt = -xi*square_lattice_dispersion(kt)
+    i    = ik2ix(kpoint)
+    j    = ik2iy(kpoint)
+    Ak   = Afield(tbar,Ek)
+    kt   = kgrid(i,j) - Ak
+    Hkt  = -xi*square_lattice_dispersion(kt)
   end function Hamkt
 
 
@@ -170,7 +168,7 @@ contains
     integer,intent(in) :: it
     complex(8)         :: qkret
     ! if(it==1)then
-    !    qkret=-xi
+    !    Qkret=-xi
     !    return
     ! endif
     qkret=zero
@@ -277,13 +275,15 @@ contains
   !PURPOSE  : print out useful information
   !+-------------------------------------------------------------------+
   subroutine print_out_Gloc()
-    integer                         :: i,j,ix,iy,ik
+    integer                         :: i,j,ix,iy,ik,intf
     type(vect2D)                    :: Jk,Ak
     type(vect2D),dimension(1:nstep) :: Jloc                   !local Current 
     real(8),dimension(1:nstep)      :: nt,modJloc             !occupation(time)
+    complex(8),dimension(Nstep,Nstep) :: locGgtr
 
     call store_data(trim(data_dir)//"/nk.data",nk)
     if(plot3D)call plot_keldysh_contour_gf(locG,time,trim(plot_dir)//"/Gloc")
+
 
     ! forall(i=1:nstep,j=1:nstep)
     !    gf%less%t(i-j) = locG%less(i,j)
@@ -323,6 +323,19 @@ contains
        endif
     endif
 
+
+    forall(i=1:Nstep,j=1:Nstep,i>=j)locGgtr(i,j) = locG%less(i,j) + locG%ret(i,j)
+    forall(i=1:Nstep,j=1:Nstep,i<j)locGgtr(i,j)=-conjg(locGgtr(j,i))
+    intf=800
+    do j=1,Nstep,Nstep/10
+       intf=intf+1
+       rewind(intf)
+       do i=1,Nstep
+          write(intf,"(7F26.16)")time(i),dimag(locG%less(i,j)),dreal(locG%less(i,j)),&
+               dimag(locGgtr(i,j)),dreal(locGgtr(i,j)),&
+               dimag(locG%ret(i,j)),dreal(locG%ret(i,j))
+       enddo
+    enddo
   end subroutine print_out_Gloc
 
 

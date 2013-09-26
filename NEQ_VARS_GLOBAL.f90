@@ -345,7 +345,7 @@ contains
     call parse_cmd_variable(data_dir     ,"DATA_DIR")
     call parse_cmd_variable(plot_dir     ,"PLOT_DIR")
 
-    if(U==0.d0)Nloop=1
+    !if(U==0.d0)Nloop=1
 
     if(mpiID==0)then
        write(*,*)"CONTROL PARAMETERS"
