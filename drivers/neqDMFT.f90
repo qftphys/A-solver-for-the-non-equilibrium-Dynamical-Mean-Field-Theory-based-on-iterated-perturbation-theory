@@ -9,7 +9,6 @@ program neqDMFT
   USE ELECTRIC_FIELD    !contains electric field init && routines
   USE NEQ_BATH          !contains bath inizialization
   USE NEQ_IPT           !performs the non-eq. IPT. Write Sigma
-  USE NEQ_UPDATE_WF     !contains routines for WF update and printing.
   USE NEQ_KADANOFF_BAYM !solves KB equations numerically to get k-sum
   USE NEQ_RESULTS
   implicit none

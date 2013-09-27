@@ -26,7 +26,7 @@ MODULE RK24_VIDE
   public :: vie_rk4
   public :: vide_rk2
   public :: vide_rk4
-  public :: get_quadrature_weights
+
 contains
 
   !---------------------------------------------------------------------
@@ -408,17 +408,18 @@ contains
     df1  = ek(1)*f(1) + q(1)    !derivative at t=1
 
     ! Solve n=2&3 together (block-by-block method) interpolate the kernel at the mid-point:
+    ! Solve n=2&3 together (block-by-block method) interpolate the kernel at the mid-point:
     ker0 = 3.d0/8.d0*ker(2,1) + 3.d0/4.d0*ker(2,2) - 1.d0/8.d0*ker(2,3)
     ker01= 3.d0*ker0/2.d0 + ker(2,1)
     ker02= 3.d0*ker0      + ker(2,2)
     !
-    Alin(1,1) =  2.d0*h/3.d0*ek(2) + h*h/9.d0*ker02 - h*h/9.d0*ker(3,2) - 1.d0
-    Alin(1,2) = -h/12.d0*ek(3)     - h*h/18.d0*ker0 - h*h/12.d0/3.d0*ker(3,3)
-    Blin(1)   = -(5.d0*h/12.d0*df1 + 2.d0*h/3.d0*q(2) - h/12.d0*q(3) + (1.d0 - h/12.d0*h/3.d0*ker(3,1) + h*h/9.d0*ker01)*f(1) )
+    Alin(1,1) =  2.d0/3.d0*h*ek(2) + h*h/9.d0*ker02 - h*h/9.d0*ker(3,2) - 1.d0
+    Alin(1,2) = -(h/12.d0*ek(3)    + h/6.d0*h/3.d0*ker0  + h/6.d0*h/6.d0*ker(3,3))
+    Blin(1)   = -(5.d0*h/12.d0*df1 + 2.d0/3.d0*h*q(2)    - h/12.d0*q(3) + f(1)*(1.d0+h*h/9.d0*ker01-h/6d0*h/6d0*ker(3,1)))
     !
-    Alin(2,1) =  h*h*4.d0/9.d0*ker(3,2) + 4.d0/3.0*h*ek(2) + 2.d0/9.d0*h*h*ker02
-    Alin(2,2) = -h*h/9.d0*ker0 - (1.d0 - ek(3)*h/3.d0 - h*h/9.d0*ker(3,3))
-    Blin(2)   = -(h/3.d0*df1 + h/3.d0*q(3) +  4.d0/3.d0*h*q(2) + (1.d0 + h/3d0*h/3.d0*ker(3,1) + 2.d0*h*h/9.d0*ker01)*f(1) )
+    Alin(2,1) =  4.d0/3.0*h*ek(2) + 2.d0*h*h/9.d0*ker02 + h*h*4.d0/9.d0*ker(3,2)
+    Alin(2,2) = -h*h/9.d0*ker0 - 1.d0 + h/3.d0*ek(3) + h*h/9.d0*ker(3,3)
+    Blin(2)   = -(h/3.d0*df1 + h/3.d0*q(3) +  4.d0*h/3.d0*q(2) + f(1)*(1.d0 + 2.d0*h*h/9.d0*ker01 + h*h/9.d0*ker(3,1)))
     !
     detA     = Alin(1,1)*Alin(2,2)-Alin(1,2)*Alin(2,1)
     Ainv(1,1)= Alin(2,2)/detA
@@ -433,15 +434,15 @@ contains
 
     do n=4,Nt
        call get_quadrature_weights(wt(1:n),4)
-       A = 1.d0 - h/3.d0*ek(n) - ker(n,n)*h*h/3.d0*wt(n)
        C = 0.d0
        do j=1,n-1
-          C = C + ker(n,j)*f(j)*wt(j)*h
+          C = C + ker(n,j)*f(j)*wt(j)
        enddo
-       B = f(n-2) + ( df2 + 4.d0*df1 + q(n) + C )*h/3.d0
+       A = 1.d0 - h/3.d0*ek(n) - h/3.d0*h*wt(n)*ker(n,n)
+       B = f(n-2) + ( df2 + 4.d0*df1 + q(n) + h*C)*h/3.d0
        f(n) = B/A
        df2  = df1
-       df1  = ek(n)*f(n) + q(n) + C + ker(n,n)*f(n)*h*wt(n)
+       df1  = ek(n)*f(n) + q(n) + h*C + h*wt(n)*ker(n,n)*f(n)
     enddo
   end subroutine d_vide_rk4
 
@@ -475,17 +476,19 @@ contains
     f(1) = f0                   !initial condition == first time step
     df1  = ek(1)*f(1) + q(1)    !derivative at t=1
 
+    ! Solve n=2&3 together (block-by-block method) interpolate the kernel at the mid-point:
+    ! Solve n=2&3 together (block-by-block method) interpolate the kernel at the mid-point:
     ker0 = 3.d0/8.d0*ker(2,1) + 3.d0/4.d0*ker(2,2) - 1.d0/8.d0*ker(2,3)
     ker01= 3.d0*ker0/2.d0 + ker(2,1)
     ker02= 3.d0*ker0      + ker(2,2)
     !
-    Alin(1,1) =  2.d0*h/3.d0*ek(2) + h*h/9.d0*ker02 - h*h/9.d0*ker(3,2) - 1.d0
-    Alin(1,2) = -h/12.d0*ek(3)     - h*h/18.d0*ker0 - h*h/12.d0/3.d0*ker(3,3)
-    Blin(1)   = -(5.d0*h/12.d0*df1 + 2.d0*h/3.d0*q(2) - h/12.d0*q(3) + (1.d0 - h/12.d0*h/3.d0*ker(3,1) + h*h/9.d0*ker01)*f(1) )
+    Alin(1,1) =  2.d0/3.d0*h*ek(2) + h*h/9.d0*ker02 - h*h/9.d0*ker(3,2) - 1.d0
+    Alin(1,2) = -(h/12.d0*ek(3)    + h/6.d0*h/3.d0*ker0  + h/6.d0*h/6.d0*ker(3,3))
+    Blin(1)   = -(5.d0*h/12.d0*df1 + 2.d0/3.d0*h*q(2)    - h/12.d0*q(3) + f(1)*(1.d0+h*h/9.d0*ker01-h/6d0*h/6d0*ker(3,1)))
     !
-    Alin(2,1) =  h*h*4.d0/9.d0*ker(3,2) + 4.d0/3.0*h*ek(2) + 2.d0/9.d0*h*h*ker02
-    Alin(2,2) = -h*h/9.d0*ker0 - (1.d0 - ek(3)*h/3.d0 - h*h/9.d0*ker(3,3))
-    Blin(2)   = -(h/3.d0*df1 + h/3.d0*q(3) +  4.d0/3.d0*h*q(2) + (1.d0 + h/3d0*h/3.d0*ker(3,1) + 2.d0*h*h/9.d0*ker01)*f(1) )
+    Alin(2,1) =  4.d0/3.0*h*ek(2) + 2.d0*h*h/9.d0*ker02 + h*h*4.d0/9.d0*ker(3,2)
+    Alin(2,2) = -h*h/9.d0*ker0 - 1.d0 + h/3.d0*ek(3) + h*h/9.d0*ker(3,3)
+    Blin(2)   = -(h/3.d0*df1 + h/3.d0*q(3) +  4.d0*h/3.d0*q(2) + f(1)*(1.d0 + 2.d0*h*h/9.d0*ker01 + h*h/9.d0*ker(3,1)))
     !
     detA     = Alin(1,1)*Alin(2,2)-Alin(1,2)*Alin(2,1)
     Ainv(1,1)= Alin(2,2)/detA
@@ -494,20 +497,21 @@ contains
     Ainv(2,1)=-Alin(2,1)/detA
     f(2:3) = matmul(Ainv,blin)
 
+    !one must evaluate df1=f'(4-1=3) and df2=f'(4-2=2) to start the loop for n>3
     df2=ek(2)*f(2) + q(2) + h/2.d0*(ker(2,1)*f(1)+ker(2,2)*f(2))
     df1=ek(3)*f(3) + q(3) + h/3.d0*(ker(3,1)*f(1) + 4.d0*ker(3,2)*f(2) + ker(3,3)*f(3))
 
     do n=4,Nt
        call get_quadrature_weights(wt(1:n),4)
-       A = 1.d0 - h/3.d0*ek(n) - ker(n,n)*h*h/3.d0*wt(n)
        C = 0.d0
        do j=1,n-1
-          C = C + ker(n,j)*f(j)*wt(j)*h
+          C = C + ker(n,j)*f(j)*wt(j)
        enddo
-       B = f(n-2) + ( df2 + 4.d0*df1 + q(n) + C )*h/3.d0
+       A = 1.d0 - h/3.d0*ek(n) - h/3.d0*h*wt(n)*ker(n,n)
+       B = f(n-2) + ( df2 + 4.d0*df1 + q(n) + h*C)*h/3.d0
        f(n) = B/A
        df2  = df1
-       df1  = ek(n)*f(n) + q(n) + C + ker(n,n)*f(n)*h*wt(n)
+       df1  = ek(n)*f(n) + q(n) + h*C + h*wt(n)*ker(n,n)*f(n)
     enddo
   end subroutine c_vide_rk4
 

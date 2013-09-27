@@ -7,7 +7,7 @@ DIR=./drivers
 DIREXE= $(HOME)/.bin
 BRANCH= $(shell git rev-parse --abbrev-ref HEAD)
 
-OBJS =  VIDE_RK24.o CONTOUR_GF.o NEQ_VARS_GLOBAL.o ELECTRIC_FIELD.o NEQ_BATH.o NEQ_IPT.o NEQ_UPDATE_WF.o NEQ_KADANOFF_BAYM.o NEQ_RESULTS.o
+OBJS =  VIDE_RK24.o CONTOUR_GF.o NEQ_VARS_GLOBAL.o ELECTRIC_FIELD.o NEQ_BATH.o NEQ_IPT.o NEQ_KADANOFF_BAYM.o NEQ_RESULTS.o
 
 
 FLAG=$(STD)
@@ -25,7 +25,6 @@ compile: version $(OBJS)
 	@echo ""
 	@echo ""
 	@echo "created" $(DIREXE)/$(EXE)_$(BRANCH)
-
 
 
 .f90.o:	

@@ -102,7 +102,6 @@ contains
     integer                     :: ik
     integer                     :: i,j
     complex(8)                  :: gless0
-    complex(8),dimension(Nstep) :: ick_less
 
     !Set the k-point index
     kpoint=ik
@@ -117,17 +116,15 @@ contains
     enddo
     locG%ret  = locG%ret + Gk%ret(:,:)*wt(ik)
 
-
     !SOLVE LESS COMPONENT:
-    tstride = 0                  !<-- enters in Hamkt
+    tstride = 0                 !<-- enters in Hamkt
     ytime   = 1
     gless0  = xi*eq_nk(ik)      !<-- initial conditions
     Gkadv   = conjg(Gk%ret(ytime,:))
     call vide_rk2(dt,Gk%less(:,ytime),gless0,Hamkt,Qkless,Skernel)
-    ick_less= -conjg(Gk%less(:,ytime))
     do ytime=2,Nstep            !<-- loop over ytime global var
-       gless0 = ick_less(ytime)
-       Gkadv  = conjg(Gk%ret(ytime,:))
+       gless0 = -conjg(Gk%less(ytime,1))
+       Gkadv  =  conjg(Gk%ret(ytime,:))
        call vide_rk2(dt,GK%less(1:ytime,ytime),gless0,Hamkt,Qkless,Skernel)
     enddo
     locG%less = locG%less + Gk%less*wt(ik)
@@ -167,10 +164,6 @@ contains
   function Qkret(it)
     integer,intent(in) :: it
     complex(8)         :: qkret
-    ! if(it==1)then
-    !    Qkret=-xi
-    !    return
-    ! endif
     qkret=zero
   end function Qkret
 
@@ -182,9 +175,10 @@ contains
   function Qkless(it)
     integer,intent(in) :: it
     complex(8)         :: Qkless
-    Qkless = -xi*trapz(dt,Skb%less(it,1:ytime)*Gkadv(1:ytime))
+    complex(8)         :: Vint(Nstep)
+    Qkless = -xi*trapz(dt,&
+         (Sigma%less(it,1:ytime) + S0%less(it,1:ytime))*Gkadv(1:ytime))
   end function Qkless
-
 
 
   !+-------------------------------------------------------------------+
@@ -194,37 +188,9 @@ contains
   function Skernel(it,is)
     integer,intent(in) :: it,is
     complex(8)         :: Skernel
-    Skernel=-xi*Skb%ret(it,is)
+    Skernel=-xi*(Sigma%ret(it+tstride,is+tstride) + S0%ret(it+tstride,is+tstride))
   end function Skernel
 
-
-
-  ! !+-------------------------------------------------------------------+
-  ! !PURPOSE  : Evaluate the collision integrals along the whole line t=1:Nt
-  ! ! for t`= ytime
-  ! !+-------------------------------------------------------------------+
-  ! function Icollision_less(ytime) result(Ik)
-  !   integer                     :: ytime
-  !   integer                     :: i
-  !   complex(8),dimension(Nstep) :: Ik
-  !   complex(8),dimension(Nstep) :: gkadv
-  !   ! Ik = \int_0^{t'=ytime} S^<*Gk^A
-  !   gkadv =  conjg(Gk%ret(ytime,:))
-  !   select case(int_method)
-  !   case default
-  !      do i=1,Nstep
-  !         Ik(i) = trapz(dt,Skb%less(i,1:ytime)*gkadv(1:ytime))
-  !      enddo
-  !   case ("simps")
-  !      do i=1,Nstep
-  !         Ik(i) = simps(dt,Skb%less(i,1:ytime)*gkadv(1:ytime))
-  !      enddo
-  !   case ("rect")
-  !      do i=1,Nstep
-  !         Ik(i) = sum(Skb%less(i,1:ytime)*gkadv(1:ytime))*dt
-  !      enddo
-  !   end select
-  ! end function Icollision_less
 
 
 
@@ -284,17 +250,6 @@ contains
     call store_data(trim(data_dir)//"/nk.data",nk)
     if(plot3D)call plot_keldysh_contour_gf(locG,time,trim(plot_dir)//"/Gloc")
 
-
-    ! forall(i=1:nstep,j=1:nstep)
-    !    gf%less%t(i-j) = locG%less(i,j)
-    !    gf%ret%t(i-j)  = locG%ret(i,j)
-    ! end forall
-    ! call fftgf_rt2rw(gf%ret%t,gf%ret%w,nstep) ;  gf%ret%w=gf%ret%w*dt ; call swap_fftrt2rw(gf%ret%w)
-    ! call splot("locGless_t.ipt",t,gf%less%t,append=.true.)
-    ! call splot("locGret_t.ipt",t,gf%ret%t,append=.true.)
-    ! call splot("locGret_realw.ipt",wr,gf%ret%w,append=.true.)
-    ! call splot("locDOS.ipt",wr,-aimag(gf%ret%w)/pi,append=.true.)
-
     forall(i=1:nstep)nt(i)=-xi*locG%less(i,i)
 
     Jloc=Vzero    
@@ -307,7 +262,7 @@ contains
        enddo
     enddo
     call splot("nVStime.ipt",time,2.d0*nt,append=.true.)
-    if(Efield/=0.d0)call splot("JlocVStime.ipt",time,Jloc%x,Jloc%y,append=.true.)
+    call splot("JlocVStime.ipt",time,Jloc%x,Jloc%y,append=.true.)
 
 
     if(fchi)then
@@ -324,15 +279,12 @@ contains
     endif
 
 
-    forall(i=1:Nstep,j=1:Nstep,i>=j)locGgtr(i,j) = locG%less(i,j) + locG%ret(i,j)
-    forall(i=1:Nstep,j=1:Nstep,i<j)locGgtr(i,j)=-conjg(locGgtr(j,i))
     intf=800
     do j=1,Nstep,Nstep/10
        intf=intf+1
        rewind(intf)
        do i=1,Nstep
-          write(intf,"(7F26.16)")time(i),dimag(locG%less(i,j)),dreal(locG%less(i,j)),&
-               dimag(locGgtr(i,j)),dreal(locGgtr(i,j)),&
+          write(intf,"(5F26.16)")time(i),dimag(locG%less(i,j)),dreal(locG%less(i,j)),&
                dimag(locG%ret(i,j)),dreal(locG%ret(i,j))
        enddo
     enddo
