@@ -49,8 +49,8 @@ program neqDMFT
   cc_params%t = linspace(0.d0,cc_params%tmax,cc_params%Ntime,mesh=dt)
   cc_params%tau(0:) = linspace(0.d0,cc_params%beta,cc_params%Ntau+1,mesh=dtau)
   cc_params%wm  = pi/cc_params%beta*dble(2*arange(1,cc_params%Lf)-1)
-  print*,"dt=",dt,cc_params%dt
-  print*,"dtau=",dtau,cc_params%dtau
+  print*,"dt  =",cc_params%dt
+  print*,"dtau=",cc_params%dtau
 
 
   !SET THE ELECTRIC FIELD (in electric_field):
@@ -81,33 +81,12 @@ program neqDMFT
 
 
 
-  !READ OR GUESS THE INITIAL WEISS FIELD G0
-  call init_equilibrium_weiss_field(Gwf,cc_params)
-
+  !READ OR GUESS THE INITIAL SELF-ENERGY
+  call init_equilibrium_guess(Sigma,cc_params)
 
 
   !GET THE STARTING CONDITIONS: 
   !BUILD THE T=0(itime=1) FUNCTION FROM NON-INTERACTING SOLUTION
-  !*this step depends on the impurity solver*
-  !
-  ! initialize the self-energy for real-time evolution
-  ! sigma^M(0,0) = -*U*U*G0(tau)*G0(-tau)*G0(tau)
-  ! sigma^<(0,0) = i^3*U*U*G0(0-)*G0(0+)*G0(0-)
-  ! sigma^>(0,0) = i^3*U*U*G0(0+)*G0(0-)*G0(0+)
-  ! sigma^\lmix(0,t) = i^3*U(0+)*U(0-)*G0(-t)*G0(t)*G0(-t)
-  ! sigma^R(0,0) = sigma^> - sigma^<
-  do j=0,cc_params%Ntau
-     Sigma%mats(j) = U*U*Gwf%mats(j)*Gwf%mats(cc_params%Ntau-j)*Gwf%mats(j)
-  end do
-  call fftgf_tau2iw(Sigma%mats(0:),Sigma%iw,beta)
-  Sigma%iw = xi*dimag(sigma%iw)
-  Sigma%less(1,1)=(xi**3)*U*U*Gwf%mats(cc_params%Ntau)*Gwf%mats(1)*Gwf%mats(cc_params%Ntau)
-  Sigma_gtr      =(xi**3)*U*U*Gwf%mats(1)*Gwf%mats(cc_params%Ntau)*Gwf%mats(1)
-  do j=0,cc_params%Ntau
-     Sigma%lmix(1,j)=(xi**3)*U*U*Gwf%mats(cc_params%Ntau-j)*Gwf%mats(j)*Gwf%mats(cc_params%Ntau-j)
-  end do
-  Sigma%ret(1,1) = Sigma_gtr - Sigma%less(1,1)
-
   Gloc = zero
   do ik=1,Lk 
      call setup_initial_conditions(Sigma,Gk(ik),dGk(ik),ik,cc_params)
@@ -123,9 +102,7 @@ program neqDMFT
   !================================================================
   !UP TO HERE YOU HAVE ALL G_loc,G_k,G_0,Sigma in the square [1,1]
   !================================================================
-  allocate(n_t(cc_params%Ntime))
-  allocate(Jloc(cc_params%Ntime))
-  allocate(ndens(0:Nx,0:Nx,cc_params%Ntime))
+
 
 
   !START THE TIME_STEP LOOP  1<t<=Nt
@@ -134,8 +111,8 @@ program neqDMFT
      print*,""
      print*,"time step=",itime
      cc_params%Nt=itime
-     !prepare the weiss-field at this actual time_step for DMFT:
-     call setup_weiss_field(Gwf,cc_params)
+
+     call setup_sigma(Sigma,cc_params)
      do ik=1,Lk
         dGk_old(ik) = dGk(ik)
      enddo
@@ -157,7 +134,7 @@ program neqDMFT
         !sum over all k-points
         Gedge=zero
         do ik=1,Lk
-           !call setup_initial_conditions(Sigma,Gk(ik),dGk(ik),ik,cc_params)
+           !call setup_initial_conditions(Ker,Gk(ik),dGk(ik),ik,cc_params)
            ham(:)=hamkt(ik,cc_params%ntime,cc_params)
            call vide_kb_contour_gf(Ham,Ker,Gk(ik),dGk_old(ik),dGk(ik),cc_params)
            nk(itime,ik)=-xi*Gk(ik)%less(itime,itime)
@@ -185,7 +162,9 @@ program neqDMFT
 
 
   !EVALUATE AND PRINT THE RESULTS OF THE CALCULATION
-
+  allocate(n_t(cc_params%Ntime))
+  allocate(Jloc(cc_params%Ntime))
+  allocate(ndens(0:Nx,0:Nx,cc_params%Ntime))
   forall(i=1:cc_params%Ntime)n_t(i) = -xi*Gloc%less(i,i)
   Jloc=Vzero
   do ik=1,Lk
@@ -214,10 +193,10 @@ contains
 
 
 
-  subroutine init_equilibrium_weiss_field(g0,params)
-    type(kb_contour_gf)     :: g0
+  subroutine init_equilibrium_guess(self,params)
+    type(kb_contour_gf)     :: self
     type(kb_contour_params) :: params
-    real(8)                 :: wm,res,ims
+    real(8)                 :: wm,res,ims,C0,C1,n0
     logical                 :: bool
     integer                 :: i,j,k,ik,unit,len,N,L,Lf
     complex(8)              :: zeta,hamk(1)
@@ -232,7 +211,7 @@ contains
     !IF NOT, START FROM NON-INTERACTING (SIGMA=0)
     inquire(file=trim(g0file),exist=bool)
     if(bool)then
-       write(*,"(A)")"Reading initial G0(iw) from file "//reg(g0file)
+       write(*,"(A)")"Reading initial Sigma(iw) from file "//reg(g0file)
        unit = free_unit()
        open(unit,file=reg(g0file),status='old')
        i = file_length(reg(g0file))
@@ -242,28 +221,23 @@ contains
        endif
        do i=1,Lf
           read(unit,*)wm,ims,res
-          g0%iw(i) = dcmplx(res,ims)
+          self%iw(i) = dcmplx(res,ims)
        enddo
        close(unit)
     else
-       write(*,"(A)")"Start from Non-interacting G0(iw)"
-       do i=1,Lf
-          wm    = pi/beta*dble(2*i-1)
-          zeta  = dcmplx(0.d0,wm)
-          g0%iw(i) = sum_overk_zeta(zeta,epsik,wt)
-          ! do ik=1,Lk
-          !    hamk = Hamkt(ik,1,params)
-          !    g0%iw(i) =  g0%iw(i) + wt(ik)/(xi*params%wm - hamk(1))!gfbethe(wm,zeta,2.d0*ts)
-          ! enddo
-       enddo
+       stop "Need a non-interacting Sigma(iw) to start... go get one!"
     endif
-    !NOW YOU NEED TO PROPAGATE THE SOLUTION to G0^{x=M,<,R,\lmix}
-    call fftgf_iw2tau(g0%iw,g0%mats(0:),params%beta)
-    g0%less(1,1) = -xi*g0%mats(L)
-    g0%ret(1,1)  = -xi
-    forall(i=0:L)g0%lmix(1,i)=-xi*g0%mats(L-i)
+    !NOW YOU NEED TO PROPAGATE THE EQUILIBRIUM SOLUTION to SIGMA^{x=M,<,R,\lmix}
+    n0=1.d0/2.d0
+    C0=Uloc(1)*(n0-0.5d0)
+    C1=Uloc(1)**2*n0*(1.d0-n0)
+    call fftgf_iw2tau(self%iw -C1/(xi*params%wm)-C0,self%mats(0:),beta,notail=.true.)
+    self%mats=self%mats-C1*0.5d0
+    self%less(1,1) = -xi*self%mats(L)
+    self%ret(1,1)  = xi*(self%mats(0)+self%mats(L))
+    forall(i=0:L)self%lmix(1,i)=-xi*self%mats(L-i)
     !
-  end subroutine init_equilibrium_weiss_field
+  end subroutine init_equilibrium_guess
 
 
 
@@ -317,12 +291,12 @@ contains
 
 
 
-  subroutine setup_weiss_field(g0,params)
-    type(kb_contour_gf)                   :: g0
+  subroutine setup_sigma(self,params)
+    type(kb_contour_gf)                   :: self
     type(kb_contour_params)               :: params
     integer                               :: i,j,k,N,L
-    if(.not.g0%status)stop "init_g0: g0 is not allocated"
-    if(.not.params%status)stop "init_g0: params is not allocated"
+    if(.not.self%status)stop "setup_sigma: self is not allocated"
+    if(.not.params%status)stop "setup_sigma: params is not allocated"
     !
     N = params%Nt
     L = params%Ntau
@@ -334,36 +308,36 @@ contains
     case(2)
        !GUESS G0 AT THE NEXT STEP, GIVEN THE INITIAL CONDITIONS
        do j=1,N
-          g0%ret(N,j) =g0%ret(1,1)
-          g0%less(N,j)=g0%less(1,1)
+          self%ret(N,j) =self%ret(1,1)
+          self%less(N,j)=self%less(1,1)
        end do
        do i=1,N-1
-          g0%less(i,N)=g0%less(1,1)
+          self%less(i,N)=self%less(1,1)
        end do
        do j=0,L
-          g0%lmix(N,j)=g0%lmix(1,j)
+          self%lmix(N,j)=self%lmix(1,j)
        end do
 
     case default
-       !EXTEND G0 FROM THE [N-1,N-1] TO THE [N,N] SQUARE TO START DMFT
+       !EXTEND SELF FROM THE [N-1,N-1] TO THE [N,N] SQUARE TO START DMFT
        !USING QUADRATIC EXTRAPOLATION
        do k=1,N-1
-          g0%less(N,k)=2.d0*g0%less(N-1,k)-g0%less(N-2,k)
-          g0%less(k,N)=2.d0*g0%less(k,N-1)-g0%less(k,N-2)
+          self%less(N,k)=2.d0*self%less(N-1,k)-self%less(N-2,k)
+          self%less(k,N)=2.d0*self%less(k,N-1)-self%less(k,N-2)
        end do
-       g0%less(N,N)=2.d0*g0%less(N-1,N-1)-g0%less(N-2,N-2)
+       self%less(N,N)=2.d0*self%less(N-1,N-1)-self%less(N-2,N-2)
        !
        do k=0,L
-          g0%lmix(N,k)=2.d0*g0%lmix(N-1,k)-g0%lmix(N-2,k)
+          self%lmix(N,k)=2.d0*self%lmix(N-1,k)-self%lmix(N-2,k)
        end do
        !
-       g0%ret(N,N)=-xi
+       self%ret(N,N)=-xi
        do k=1,N-2
-          g0%ret(N,k)=2.d0*g0%ret(N-1,k)-g0%ret(N-2,k)
+          self%ret(N,k)=2.d0*self%ret(N-1,k)-self%ret(N-2,k)
        end do
-       g0%ret(N,N-1)=0.5d0*(g0%ret(N,N)+g0%ret(N,N-2))
+       self%ret(N,N-1)=0.5d0*(self%ret(N,N)+self%ret(N,N-2))
     end select
-  end subroutine setup_weiss_field
+  end subroutine setup_sigma
 
 
 

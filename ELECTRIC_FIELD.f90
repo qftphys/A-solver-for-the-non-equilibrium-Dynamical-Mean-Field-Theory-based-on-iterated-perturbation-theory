@@ -27,7 +27,6 @@ contains
     endif
     Ek%x=Ex;Ek%y=Ey
     call msg("|E|=E0="//trim(txtfy(Efield/modulo)),id=0)
-    if(alat==0)call error("a_lat=0! EXIT")
     check=.false.
     check=field_type=="dc".OR.&
          field_type=="ac".OR.&

@@ -7,16 +7,17 @@ DIR=./drivers
 DIREXE= $(HOME)/.bin
 BRANCH= $(shell git rev-parse --abbrev-ref HEAD)
 
-OBJS =  VIDE_RK24.o CONTOUR_GF.o NEQ_VARS_GLOBAL.o ELECTRIC_FIELD.o NEQ_BATH.o NEQ_IPT.o NEQ_KADANOFF_BAYM.o NEQ_RESULTS.o
+OBJS =  CONTOUR_GF.o NEQ_VARS_GLOBAL.o ELECTRIC_FIELD.o NEQ_THERMOSTAT.o NEQ_IPT.o #NEQ_RESULTS.o
 
 
 FLAG=$(STD)
-#FLAG=$(OPT)
 ARGS= $(SFLIBS)
 
 #FLAG=$(DEB)
 #ARGS= $(SFLIBS_DEB)
 
+#FLAG=$(OPT)
+#ARGS= $(SFLIBS)
 
 compile: version $(OBJS)
 	@echo " ..................... compile ........................... "
