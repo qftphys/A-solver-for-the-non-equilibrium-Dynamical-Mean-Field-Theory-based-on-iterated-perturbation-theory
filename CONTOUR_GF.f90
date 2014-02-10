@@ -479,9 +479,10 @@ contains
   !======= CONVOLUTION ======= 
   !C(t,t')=(A*B)(t,t'), with t=t_max && t'=0,t_max
   !t_max_index==N
-  subroutine convolute_kb_contour_gf(A,B,C,params)
+  subroutine convolute_kb_contour_gf(A,B,C,params,sign)
     type(kb_contour_gf)                 :: A,B,C
     type(kb_contour_params)             :: params
+    real(8),optional                    :: sign
     integer                             :: N,L
     real(8)                             :: dt,dtau
     complex(8),dimension(:),allocatable :: AxB    
@@ -523,7 +524,7 @@ contains
        !break the integral I1 in two parts to take care of the 
        !sign of (tau-tau').
        do k=0,jtau
-          AxB(k)=A%lmix(N,k)*B%mats(k + L-jtau)!!!!ACTHUNG HERE W/ W/OUT +1!!!!
+          AxB(k)=A%lmix(N,k)*B%mats(L+k-jtau)
        end do
        C%lmix(N,jtau)=C%lmix(N,jtau)-dtau*kb_trapz(AxB(0:),0,jtau)
        do k=jtau,L
@@ -533,7 +534,6 @@ contains
        !
        !I2:
        AxB(0:) = zero
-       !AxB(1:N) = A%ret(N,1:N)*B%lmix(1:N,jtau)
        do k=1,N
           AxB(k) = A%ret(N,k)*B%lmix(k,jtau)
        enddo
@@ -565,7 +565,7 @@ contains
     !
     ! (t,t')=>(i,N) <==> Horizontal side, w/ tip (i=1,N)
     do i=1,N
-       C%less(i,n)=zero
+       C%less(i,N)=zero
        do k=0,L
           AxB(k)=A%lmix(i,k)*conjg(B%lmix(n,L-k))
        end do
@@ -583,6 +583,12 @@ contains
     end do
     !
     deallocate(AxB)
+    if(present(sign))then
+       C%lmix(N,0:L) = sign*C%lmix(N,0:L)
+       C%less(N,1:N-1)=sign*C%less(N,1:N-1)
+       C%less(1:N,N)=sign*C%less(1:N,N)
+       C%ret(N,1:N)=sign*C%ret(N,1:N)
+    endif
     !
   end subroutine convolute_kb_contour_gf
 
@@ -653,7 +659,7 @@ contains
   !======= VOLTERRA INTEGRAL EQUATION ======= 
   !----------------------------------------------------------------------------
   !  This subroutine solves a Volterra integral equation of the second kind,
-  !              G(t,t')=Q(t,t')+(K*G)(t,t'),
+  !              G(t,t')+(K*G)(t,t')=Q(t,t')
   !  for t=n*dt or t'=n*dt, using 2^nd *implicit* Runge-Kutta method.
   !----------------------------------------------------------------------------
   subroutine vie_kb_contour_gf(Q,K,G,params)
@@ -1150,3 +1156,4 @@ contains
 
 
 END MODULE CONTOUR_GF
+

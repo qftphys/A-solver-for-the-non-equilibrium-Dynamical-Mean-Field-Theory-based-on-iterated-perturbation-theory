@@ -1,23 +1,33 @@
 #=========================================================================
 include sfmake.inc
 #=========================================================================
-FC=ifort
-EXE   = neqDMFT
+#EXE=neqdmft_bethe
+#EXE=neqdmft_bethe_dos
+#EXE=neqdmft_hypercubic
+#EXE=neqdmft_2dsquare_quench
+EXE=neqdmft_2dsquare_field
 DIR=./drivers
 DIREXE= $(HOME)/.bin
+FC=ifort
 BRANCH= $(shell git rev-parse --abbrev-ref HEAD)
 
-OBJS =  CONTOUR_GF.o NEQ_VARS_GLOBAL.o ELECTRIC_FIELD.o NEQ_THERMOSTAT.o NEQ_IPT.o #NEQ_RESULTS.o
+OBJS =  CONTOUR_GF.o NEQ_VARS_GLOBAL.o ELECTRIC_FIELD.o NEQ_THERMOSTAT.o NEQ_IPT.o
 
 
-FLAG=$(STD)
-ARGS= $(SFLIBS)
+#=================STANDARD COMPILATION====================================
+all: FLAG=$(STD)
+all: ARGS=$(SFLIBS)
+all:compile
 
-#FLAG=$(DEB)
-#ARGS= $(SFLIBS_DEB)
+#================OPTIMIZED COMPILATION====================================
+opt: FLAG=$(OPT)
+opt: ARGS=$(SFLIBS)
+opt:compile
 
-#FLAG=$(OPT)
-#ARGS= $(SFLIBS)
+#================DEBUGGIN COMPILATION=====================================
+debug: FLAG=$(DEB)
+debug: ARGS=$(SFLIBS_DEB)
+debug:compile
 
 compile: version $(OBJS)
 	@echo " ..................... compile ........................... "

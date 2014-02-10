@@ -38,9 +38,9 @@ MODULE NEQ_VARS_GLOBAL
   integer                                :: Lkreduced     !reduced lattice dimension
   integer                                :: Nx            !lattice grid dimensions
   integer                                :: nloop         !dmft loop variables
-  integer                                :: eqnloop       !dmft loop of the equilibrium solution
   real(8)                                :: ts            !n.n. hopping amplitude
-  real(8)                                :: U             !local,non-local interaction 
+  real(8)                                :: Ui            !equilibrium local interaction
+  real(8)                                :: U             !non-equilibrium local interaction
   real(8)                                :: Vbath         !coupling to the Thermostat
   real(8)                                :: Wbath         !Width of the BATH DOS
   real(8)                                :: Walpha        !exponent of the pseudo-gapped bath.
@@ -52,7 +52,7 @@ MODULE NEQ_VARS_GLOBAL
   integer                                :: Nsuccess      !number of convergence success
   real(8)                                :: weight        !mixing weight parameter
   logical                                :: fchi
-  logical                                :: plot3D
+  logical                                :: plot3D,ifourth
   integer                                :: fupdate       !flag to decide WFupdate procedure
 
 
@@ -92,13 +92,13 @@ MODULE NEQ_VARS_GLOBAL
   !NAMELISTS:
   !=========================================================
   namelist/variables/&
-       dt,Ntime,Ntau,beta,U,ts,Lfreq,eps,  &    ! INPUT
+       dt,Ntime,Ntau,beta,Ui,U,ts,Lfreq,eps,  &    ! INPUT
        bath_type,Vbath,Wbath,Walpha,Wgap,  &    ! BATH
        Nx,Lkreduced,                       &    ! LATTICE
        Efield,Ex,Ey,field_type,t0,t1,      &    !
        Ncycles,omega0,E1,                  &    ! ELECTRIC FIELD
        nloop,dmft_error,nsuccess,weight,    &    ! DMFT
-       plot3D,fchi,fupdate,     &    ! FLAGS
+       plot3D,fchi,ifourth,fupdate,     &    ! FLAGS
        g0file,plot_dir           ! FILES & DIRS
 
 
@@ -123,6 +123,7 @@ contains
     Ntime      = 50
     Ntau       = 25
     beta       = 10.d0
+    Ui         = 2.d0
     U          = 2.d0
     ts         = 1.d0
     Lfreq      = 2048  
@@ -155,6 +156,7 @@ contains
     !FLAGS:
     plot3D       = .false.
     fchi         = .false.
+    ifourth      = .false.
     fupdate      = 0
     !FILES&DIR:
     g0file   = 'g0.restart'
@@ -178,6 +180,7 @@ contains
     call parse_cmd_variable(Nx         ,"NX")
     call parse_cmd_variable(Ntime      ,"NTIME")
     call parse_cmd_variable(beta       ,"BETA")
+    call parse_cmd_variable(Ui         ,"UI")
     call parse_cmd_variable(U          ,"U")
     call parse_cmd_variable(ts         ,"TS")
     call parse_cmd_variable(Lfreq      ,"LFREQ")
@@ -209,6 +212,7 @@ contains
     !FLAGS:
     call parse_cmd_variable(plot3D     ,"PLOT3D")
     call parse_cmd_variable(fchi       ,"FCHI")
+    call parse_cmd_variable(ifourth    ,"IFOURTH")
     call parse_cmd_variable(fupdate    ,"FUPDATE")
     !FILES&DIR:
     call parse_cmd_variable(g0file ,"G0FILE")
