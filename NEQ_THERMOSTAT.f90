@@ -64,7 +64,6 @@ contains
     S0   = zero
     S0gtr= zero
     if(Vbath==0.d0)return
-    call start_timer
     do iw=1,Lfreq
        en   = wfreq(iw)
        nless= fermi(en,beta)
@@ -102,7 +101,6 @@ contains
     !Ret component:
     S0%ret = S0gtr-S0%less
     forall(i=1:params%Ntime,j=1:params%Ntime,i<j)S0%less(i,j)=-conjg(S0%less(j,i))
-    call stop_timer
     call plot_kb_contour_gf("Sbath",S0,params)
   end subroutine get_thermostat_bath
 

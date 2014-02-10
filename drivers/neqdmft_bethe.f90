@@ -3,8 +3,9 @@
 !AUTHORS  : Adriano Amaricci 
 !###################################################################
 program neqDMFT
+  USE ERROR
+  USE FFTGF
   USE NEQ_VARS_GLOBAL   !global variables, calls to 3rd library 
-  USE ELECTRIC_FIELD    !contains electric field init && routines
   USE NEQ_THERMOSTAT    !contains bath inizialization
   implicit none
   integer                             :: i,j,ik,itime,iloop,ix,iy
@@ -104,6 +105,9 @@ program neqDMFT
      call measure_observables(Gloc,Sigma,cc_params)
   enddo
 
+
+
+
   print*,"Getting n(e,t):"
   allocate(epsi(Nx),dos(Nx))
   allocate(nk(cc_params%Ntime,Nx))
@@ -120,6 +124,9 @@ program neqDMFT
      forall(itime=1:cc_params%Ntime)nk(itime,ik)=dimag(Gwf%less(itime,itime))
   enddo
   call splot3d("nkVSepsikVStime.plot",cc_params%t,epsi,nk,wlines=.true.)
+
+
+  !call test_(Gloc,Sigma,cc_params)
 
   print*,"BRAVO"
 
@@ -351,13 +358,13 @@ contains
   !+-------------------------------------------------------------------+
   subroutine neq_solve_ipt(G0,Sigma,params)
     type(kb_contour_gf)                   :: G0
-    type(kb_contour_gf)                   :: Sigma,Sigma4(4),Chi,G2,G3
+    type(kb_contour_gf)                   :: Sigma,Sigma4(4)
     type(kb_contour_params)               :: params
     integer                               :: N,L
     complex(8),dimension(:,:),allocatable :: G0_gtr,Sigma_gtr,G0_rmix
     integer                               :: i,j,itau
     integer                               :: Ntot
-    complex(8),dimension(:,:),allocatable :: Smat,G0mat
+    complex(8),dimension(:,:),allocatable :: Smat,G0mat,G2mat,G3mat,Sfoo,Chimat
     complex(8),dimension(:),allocatable   :: tdiff
     integer                               :: ia,ib
     complex(8)                            :: int_ij,intb
@@ -391,172 +398,144 @@ contains
     forall(j=1:N)Sigma%ret(N,j) = Sigma_gtr(N,j) - Sigma%less(N,j)
 
 
+
+
+    !#################################
+    !#################################
+    !#################################
+
+
+
+
     if(ifourth)then
        print*,"Entering 4th order..."
+       Ntot = 2*N+L+1
        do i=1,4
           call allocate_kb_contour_gf(sigma4(i),params)
        enddo
-       call allocate_kb_contour_gf(Chi,params)
-       call allocate_kb_contour_gf(G2,params)
-       call allocate_kb_contour_gf(G3,params)
-
+       allocate(G0mat(Ntot,Ntot),G2mat(Ntot,Ntot),G3mat(Ntot,Ntot))
+       allocate(Chimat(Ntot,Ntot),Smat(Ntot,Ntot),Sfoo(Ntot,Ntot))
+       allocate(tdiff(Ntot))
+       tdiff(1:N)           =  params%dt
+       tdiff(N+1:2*N)       = -params%dt
+       tdiff(2*N+1:2*N+L+1) = -xi*params%dtau
 
        !Sigma^(4a):
        print*,"get 4a..."
-       do i=1,N
-          do j=1,N
-             G2%less(i,j) = G0%less(i,j)**2
-             G2%ret(i,j) = G0%ret(i,j)**2
-          enddo
-          do j=0,L
-             G2%lmix(i,j) = G0%lmix(i,j)**2
+       call kb_contour_gf2kb_matrix(G0,N,L,G0mat)
+       do i=1,Ntot
+          do j=1,Ntot
+             G2mat(i,j) = G0mat(i,j)*G0mat(i,j)
+             G3mat(i,j) = G0mat(i,j)*G0mat(i,j)*G0mat(i,j)
           enddo
        enddo
-       print*,"convolute1:"
-       call convolute_kb_contour_gf(G2,G2,Chi,params)
-       print*,"convolute2:"
-       call convolute_kb_contour_gf(G2,Chi,Sigma4(1),params)
-       do j=1,N
-          Sigma4(1)%less(N,j) = G0%less(N,j)*Sigma4(1)%less(N,j)
-          Sigma4(1)%ret(N,j) = G0%ret(N,j)*Sigma4(1)%ret(N,j)
+       print*,"convolute [G0^2*G0^2]:"
+       call convolute_kb_matrix_gf(G2mat,G2mat,N,L,params,Chimat)
+       print*,"convolute [G0^2*Chi]:"
+       call convolute_kb_matrix_gf(G2mat,Chimat,N,L,params,Sfoo)
+       do i=1,Ntot
+          do j=1,Ntot
+             Smat(i,j) = G0mat(i,j)*Sfoo(i,j)
+          enddo
        enddo
-       do i=1,N-1
-          Sigma4(1)%less(i,N) = G0%less(i,N)*Sigma4(1)%less(i,N)
-       enddo
-       do j=0,L
-          Sigma4(1)%lmix(N,j) = G0%lmix(N,j)*Sigma4(1)%lmix(N,j)
-       enddo
+       print*,"extract Sigma^a:"
+       call kb_matrix2kb_contour_gf(Smat,N,L,Sigma4(1))
+
 
 
 
        !Sigma^(4b):
        print*,"Get 4b..."
-       Chi=zero
-       do i=1,N
-          do j=1,N
-             G2%less(i,j) = G0%less(i,j)**2
-             G2%ret(i,j) = G0%ret(i,j)**2
-             G3%less(i,j) = G0%less(i,j)**3
-             G3%ret(i,j) = G0%ret(i,j)**3
-          enddo
-          do j=0,L
-             G2%lmix(i,j) = G0%lmix(i,j)**2
-             G3%lmix(i,j) = G0%lmix(i,j)**3
+       print*,"convolute [G0^3*G0]:"
+       call convolute_kb_matrix_gf(G3mat,G0mat,N,L,params,Chimat)
+       print*,"convolute [G0*Chi]:"
+       call convolute_kb_matrix_gf(G0mat,Chimat,N,L,params,Sfoo)
+       do i=1,Ntot
+          do j=1,Ntot
+             Smat(i,j) = G2mat(i,j)*Sfoo(i,j)
           enddo
        enddo
-       print*,"convolute1:"
-       call convolute_kb_contour_gf(G3,G0,Chi,params)
-       print*,"convoloute2:"
-       call convolute_kb_contour_gf(G0,Chi,Sigma4(2),params)
-       do j=1,N
-          Sigma4(2)%less(N,j) = G2%less(N,j)*Sigma4(2)%less(N,j)
-          Sigma4(2)%ret(N,j) = G2%ret(N,j)*Sigma4(2)%ret(N,j)
-       enddo
-       do i=1,N-1
-          Sigma4(2)%less(i,N) = G2%less(i,N)*Sigma4(2)%less(i,N)
-       enddo
-       do j=0,L
-          Sigma4(2)%lmix(N,j) = G2%lmix(N,j)*Sigma4(2)%lmix(N,j)
-       enddo
+       print*,"extract Sigma^b:"
+       call kb_matrix2kb_contour_gf(Smat,N,L,Sigma4(2))
+
+
+
+
 
 
        !Sigma^(4c):
        print*,"Get 4c"
-       Ntot = 2*N+L+1
-       print*,"allocate big matrices"
-       allocate(Smat(Ntot,Ntot),G0mat(Ntot,Ntot),tdiff(Ntot))
-       Smat  = zero
-       G0mat = kb_contour_gf2kb_matrix(G0,N,L)
-       print*,"Get t_diff"
-       tdiff(1:N)           =  params%dt
-       tdiff(N+1:2*N)       = -params%dt
-       tdiff(2*N+1:2*N+L+1) = -xi*params%dtau
-       print*,"entering 4loops:"
+       Smat=zero
        do i=1,Ntot
           do j=1,Ntot
-             print*,i,j
              int_ij=zero
+             !
              do ia=1,Ntot
                 intb=zero
                 do ib=1,Ntot
-                   intb = intb + G0mat(i,ia)*G0mat(ia,ib)*G0mat(ib,j)*&
-                        (G0mat(i,ib)**2)*(G0mat(ia,j)**2)*tdiff(ib)
+                   intb = intb + G0mat(i,ia)*G0mat(ia,ib)*G0mat(ib,j)*G2mat(i,ib)*G2mat(ia,j)*tdiff(ib)
                 enddo
                 int_ij = int_ij + intb*tdiff(ia)
              enddo
+             !
              Smat(i,j) = int_ij
           enddo
        enddo
-       call kb_matrix2kb_contour_gf2(Smat,N,L,chi)
-       do j=1,N
-          Sigma4(3)%less(N,j) = chi%less(N,j)
-          Sigma4(3)%ret(N,j) = chi%ret(N,j)
-       enddo
-       do i=1,N-1
-          Sigma4(3)%less(i,N) = chi%less(i,N)
-       enddo
-       do j=0,L
-          Sigma4(3)%lmix(N,j) = chi%lmix(N,j)
-       enddo
-       deallocate(Smat,G0mat,tdiff)
+       print*,"extract Sigma^c:"
+       call kb_matrix2kb_contour_gf(Smat,N,L,Sigma4(3))
+
+
 
 
 
        !Sigma^(4d):
-       Ntot = 2*N+L+1
-       allocate(Smat(Ntot,Ntot),G0mat(Ntot,Ntot),tdiff(Ntot))
+       print*,"Get 4d"
        Smat  = zero
-       G0mat = kb_contour_gf2kb_matrix(G0,N,L)
-       tdiff(1:N)           =  params%dt
-       tdiff(N+1:2*N)       = -params%dt
-       tdiff(2*N+1:2*N+L+1) = -xi*params%dtau
        do i=1,Ntot
           do j=1,Ntot
              int_ij=zero
+             !
              do ia=1,Ntot
                 intb=zero
                 do ib=1,Ntot
-                   intb = intb + G0mat(i,ia)*G0mat(ia,j)*G0mat(i,ib)*G0mat(ib,j)*&
-                        (G0mat(ia,ib)**2)*tdiff(ib)
+                   intb = intb + G0mat(i,ia)*G0mat(ia,j)*G0mat(i,ib)*G0mat(ib,j)*G2mat(ia,ib)*tdiff(ib)
                 enddo
                 int_ij = int_ij + intb*tdiff(ia)
              enddo
+             !
              Smat(i,j) = G0mat(i,j)*int_ij
           enddo
        enddo
-       call kb_matrix2kb_contour_gf2(Smat,N,L,chi)
-       do j=1,N
-          Sigma4(4)%less(N,j) = chi%less(N,j)
-          Sigma4(4)%ret(N,j) = chi%ret(N,j)
-       enddo
-       do i=1,N-1
-          Sigma4(4)%less(i,N) = chi%less(i,N)
-       enddo
-       do j=0,L
-          Sigma4(4)%lmix(N,j) = chi%lmix(N,j)
-       enddo
+       print*,"extract Sigma^d:"
+       call kb_matrix2kb_contour_gf(Smat,N,L,Sigma4(4))
+
+
+       call plot_kb_contour_gf("Sigma4a",Sigma4(1),params)
+       call plot_kb_contour_gf("Sigma4b",Sigma4(2),params)
+       call plot_kb_contour_gf("Sigma4c",Sigma4(3),params)
+       call plot_kb_contour_gf("Sigma4d",Sigma4(4),params)
 
        !============================================
+
+
+
+
 
        print*,"Sum up Sigma2+Sigma4:"
        do j=1,N
           Sigma%less(N,j) = Sigma%less(N,j) + &
-               3.d0*U*U*U*U*(Sigma4(1)%less(N,j) + Sigma4(2)%less(N,j) +&
-               Sigma4(3)%less(N,j) - Sigma4(4)%less(N,j))
+               3.d0*U*U*U*U*(Sigma4(1)%less(N,j) + Sigma4(2)%less(N,j) + Sigma4(3)%less(N,j) - Sigma4(4)%less(N,j))
           Sigma%ret(N,j) = Sigma%ret(N,j) + &
-               3.d0*U*U*U*U*(Sigma4(1)%ret(N,j) + Sigma4(2)%ret(N,j) +&
-               Sigma4(3)%ret(N,j) - Sigma4(4)%ret(N,j))
+               3.d0*U*U*U*U*(Sigma4(1)%ret(N,j) + Sigma4(2)%ret(N,j) + Sigma4(3)%ret(N,j) - Sigma4(4)%ret(N,j))
        enddo
        do i=1,N-1
           Sigma%less(i,N) = Sigma%less(i,N) + &
-               3.d0*U*U*U*U*(Sigma4(1)%less(i,N) + Sigma4(2)%less(i,N) +&
-               Sigma4(3)%less(i,N) - Sigma4(4)%less(i,N))          
+               3.d0*U*U*U*U*(Sigma4(1)%less(i,N) + Sigma4(2)%less(i,N) + Sigma4(3)%less(i,N) - Sigma4(4)%less(i,N))          
        enddo
        !!ACTHUNG!! U_i might not be correct in this expression!!
        do j=0,L
           Sigma%lmix(N,j) = Sigma%lmix(N,j) + &
-               3.d0*U*U*U*Ui*(Sigma4(1)%lmix(N,j) + Sigma4(2)%lmix(N,j) +&
-               Sigma4(3)%lmix(N,j) - Sigma4(4)%lmix(N,j))
+               3.d0*U*U*U*Ui*(Sigma4(1)%lmix(N,j) + Sigma4(2)%lmix(N,j) + Sigma4(3)%lmix(N,j) - Sigma4(4)%lmix(N,j))
        enddo
 
 
@@ -564,9 +543,9 @@ contains
        do i=1,4
           call deallocate_kb_contour_gf(sigma4(i))
        enddo
-       call deallocate_kb_contour_gf(Chi)
-       call deallocate_kb_contour_gf(G2)
-       call deallocate_kb_contour_gf(G3)
+       deallocate(G0mat,G2mat,G3mat)
+       deallocate(Chimat,Smat,Sfoo)
+       deallocate(tdiff)
     endif
 
   end subroutine neq_solve_ipt
@@ -574,50 +553,167 @@ contains
 
 
 
-  function kb_contour_gf2kb_matrix(G,N,L) result(Gkbm)
-    type(kb_contour_gf)                   :: G
-    integer                               :: N,L,i,j
-    complex(8),dimension(2*N+L+1,2*N+L+1) :: Gkbm
+  subroutine test_(G,Self,params)
+    type(kb_contour_gf)                   :: G,Self,GxS
+    type(kb_contour_params)               :: params
+    integer                               :: N,L,i,j,Ntot
+    complex(8),dimension(:,:),allocatable :: Gmat,Smat,GxSmat
+    real(8),dimension(:),allocatable      :: time
+    N=params%Ntime
+    L=params%Ntau
+    Ntot=2*N+L+1
+    allocate(time(Ntot))
+    allocate(Gmat(Ntot,Ntot),Smat(Ntot,Ntot),GxSmat(Ntot,Ntot))
+    time(1:N)=params%t(1:N)
+    time(N+1:2*N)=time(N) + params%t(1:N)
+    time(2*N+1:2*N+L+1)=time(2*N)+params%tau(0:L)/beta
+    call kb_contour_gf2kb_matrix(G,N,L,Gmat)
+    call splot3d("Gmat_test.plot",time,time,Gmat)
+    call splot3d("Gmat_11.plot",time(1:N),time(1:N),Gmat(1:N,1:N))
+    call splot3d("Gmat_31.plot",params%tau(0:L),params%t(1:N),Gmat(2*N+1:2*N+1+L,1:N))
+    G=zero
+    call kb_matrix2kb_contour_gf(Gmat,N,L,G)
+    call plot_kb_contour_gf("G_test",G,params)
+
+
+    !
+    !get convolution in ordinary way:
+    call allocate_kb_contour_gf(GxS,params)
+    do i=1,params%Ntime
+       params%Nt=i
+       call convolute_kb_contour_gf(G,Self,GxS,params)
+    enddo
+    call plot_kb_contour_gf("GxS",GxS,params)
+    !
+    !map convolution to a matrix:
+    call kb_contour_gf2kb_matrix(GxS,N,L,Smat)
+    call splot3d("GxSmat_test1.plot",time,time,Smat)
+    !
+    !Evaluate convolution using Keldysh Matrices
+    call kb_contour_gf2kb_matrix(Self,N,L,Smat)
+    call convolute_kb_matrix_gf(Gmat,Smat,N,L,params,GxSmat)
+    call splot3d("GxSmat_test2.plot",time,time,GxSmat)
+    GxS=zero
+    call kb_matrix2kb_contour_gf(GxSmat,N,L,GxS)
+    call plot_kb_contour_gf("GxS_test",GxS,params)
+  end subroutine test_
+
+
+
+  subroutine kb_contour_gf2kb_matrix(G,N,L,Gkbm)
+    type(kb_contour_gf)                    :: G
+    integer                                :: N,L,i,j
+    complex(8), dimension(:,:),allocatable :: G_gtr
+    complex(8), dimension(2*N+L+1,2*N+L+1) :: Gkbm
     Gkbm=zero
+    !Get G^> from G^<,R
+    allocate(G_gtr(N,N))
+    do i=1,N
+       do j=1,i
+          G_gtr(i,j) = G%less(i,j) + G%ret(i,j)
+       enddo
+       do j=i+1,N
+          G_gtr(i,j) = G%less(i,j) - conjg(G%ret(j,i))
+       enddo
+    enddo
+    !Get Keldysh Matrix GF:
     do i=1,N
        do j=1,N
-          Gkbm(i,j)    = G%ret(i,j)
-          Gkbm(i,N+j)  = 2.d0*G%less(i,j)
-          Gkbm(N+i,N+j)= conjg(G%ret(j,i)) !G^A(i,j) = [G^R(i,j)]^+ = G^R*(j,i)
+          Gkbm(i  ,j)   = step(i,j,.false.)*G_gtr(i,j) + step(j,i,.true.)*G%less(i,j)
+          Gkbm(i  ,N+j) = G%less(i,j)
+          Gkbm(i+N,j)   = G_gtr(i,j)
+          Gkbm(i+N,N+j) = step(i,j,.true.)*G%less(i,j) + step(j,i,.false.)*G_gtr(i,j)
        enddo
        do j=0,L
-          Gkbm(i,2*N+j+1)= sqrt(2.d0)*G%lmix(i,j)
+          Gkbm(i  ,2*N+j+1)   = G%lmix(i,j)
+          Gkbm(i+N,2*N+j+1) = G%lmix(i,j)
        enddo
     enddo
     do i=0,L
+       !get 31,32 blocks
        do j=1,N
-          Gkbm(2*N+i+1,j) = sqrt(2.d0)*conjg(G%lmix(j,L-i)) !G^rmix(itau,j) = -[G^lmix(j,-itau)]* = G^lmix*(j,beta-itau) (itau>0)
+          Gkbm(2*N+i+1,j)  =conjg(G%lmix(j,L-i))
+          Gkbm(2*N+i+1,j+N)=conjg(G%lmix(j,L-i))
        enddo
+       !get 33 Matsubara block:
        do j=0,i
-          Gkbm(2*N+i+1,2*N+j+1) = xi*G%mats(i-j)
+          Gkbm(2*N+1+i,2*N+1+j)=xi*G%mats(i-j)
        enddo
-       do j=i,L
-          Gkbm(2*N+i+1,2*N+j+1) = -xi*G%mats(L+i-j)
+       do j=i+1,L
+          Gkbm(2*N+1+i,2*N+1+j)=-xi*G%mats(L+i-j)
        enddo
     enddo
-  end function kb_contour_gf2kb_matrix
+  end subroutine kb_contour_gf2kb_matrix
 
 
-  subroutine kb_matrix2kb_contour_gf2(Gkbm,N,L,G)
+
+
+
+
+
+  subroutine kb_matrix2kb_contour_gf(Gkbm,N,L,G)
     complex(8),dimension(2*N+L+1,2*N+L+1) :: Gkbm
     type(kb_contour_gf)                   :: G
     integer                               :: N,L,i,j
     if(.not.G%status)stop "kb_matrix2kb_contour_gf2: error G is not allocated"
+    G%ret = zero
     do i=1,N
        do j=1,N
-          G%ret(i,j) = Gkbm(i,j)
-          G%less(i,j)= Gkbm(i,N+j)/2.d0
+          G%less(i,j) = Gkbm(i,N+j)
+       enddo
+       do j=1,i
+          G%ret(i,j)  = Gkbm(N+i,j) - Gkbm(i,N+j) !G^> - G^<
        enddo
        do j=0,L
-          G%lmix(i,j) = Gkbm(i,2*N+j+1)/sqrt(2.d0)
+          G%lmix(i,j) = Gkbm(i,2*N+1+j)
        enddo
     enddo
-  end subroutine kb_matrix2kb_contour_gf2
+  end subroutine kb_matrix2kb_contour_gf
+
+
+
+
+
+  subroutine convolute_kb_matrix_gf(A,B,N,L,params,C)
+    complex(8),dimension(2*N+L+1,2*N+L+1),intent(in)    :: A,B
+    type(kb_contour_params)                             :: params
+    type(kb_contour_gf)                                 :: fa,fb,fc
+    complex(8),dimension(2*N+L+1,2*N+L+1),intent(inout) :: C
+    integer                                             :: N,L,Ntot
+    integer                                             :: i,j,k
+    ! !C(i,j) = sum_k A(i,k)*B(k,j)dt_k
+    ! Ntot=2*N+L+1
+    ! C=zero
+    ! do i=1,Ntot
+    !    do j=1,Ntot
+    !       do k=1,N
+    !          C(i,j)=C(i,j)+A(i,k)*B(k,j)*params%dt
+    !       enddo
+    !       do k=1,N
+    !          C(i,j)=C(i,j)-A(i,N+k)*B(N+k,j)*params%dt
+    !       enddo
+    !       do k=1,L+1
+    !          C(i,j)=C(i,j)+xi*A(i,2*N+k)*B(2*N+k,j)*params%dtau
+    !       enddo
+    !    enddo
+    ! enddo
+    call allocate_kb_contour_gf(fa,params)
+    call allocate_kb_contour_gf(fb,params)
+    call allocate_kb_contour_gf(fc,params)
+    call kb_matrix2kb_contour_gf(A,N,L,fa)
+    call kb_matrix2kb_contour_gf(B,N,L,fb)
+    do i=1,N
+       params%Nt=i
+       call convolute_kb_contour_gf(fa,fb,fc,params)
+    enddo
+    call kb_contour_gf2kb_matrix(fc,N,L,C)
+  end subroutine convolute_kb_matrix_gf
+
+
+
+
+
+
 
 
 

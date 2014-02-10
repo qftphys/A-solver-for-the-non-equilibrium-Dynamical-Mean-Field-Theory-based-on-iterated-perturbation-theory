@@ -6,6 +6,10 @@
 !###################################################################
 program neqDMFT
   USE SQUARE_LATTICE
+  USE ERROR
+  USE FFTGF
+  USE TIMER
+  !
   USE NEQ_VARS_GLOBAL   !global variables, calls to 3rd library 
   USE ELECTRIC_FIELD    !contains electric field init && routines
   USE NEQ_THERMOSTAT    !contains bath inizialization
@@ -22,10 +26,7 @@ program neqDMFT
   complex(8),dimension(:),allocatable :: Ham
   !RESULTS:
   real(8),dimension(:,:,:),allocatable  :: nDens
-  real(8),dimension(:),allocatable      :: n_t
   real(8),dimension(:,:),allocatable    :: nk
-  type(vect2D),dimension(:),allocatable :: Jloc
-  type(vect2D)                          :: kt,Jk
 
   !READ THE INPUT FILE (in vars_global):
   call parse_cmd_variable(finput,"FINPUT",default='inputNEQ.in')
@@ -83,7 +84,7 @@ program neqDMFT
   cc_params%Nt=1
   Gloc = zero
   call init_equilibrium_functions(Gwf,Gk,dGk,Gloc,Sigma,cc_params)
-  call measure_observables(Gloc,Sigma,cc_params)
+  call measure_observables(Gloc,Gk(:),Sigma,cc_params)
   do ik=1,Lk
      nk(1,ik)=dimag(Gk(ik)%less(1,1))
   enddo
@@ -116,7 +117,9 @@ program neqDMFT
         call add_kb_contour_gf(Sbath,Sigma,Ker,cc_params)
         Gedge=zero
         do ik=1,Lk
-           ham(:)=hamkt(ik,cc_params%ntime,cc_params)
+           do i=1,itime
+              ham(i)=hamkt(ik,i,cc_params)
+           enddo
            call vide_kb_contour_gf(Ham,Ker,Gk(ik),dGk_old(ik),dGk(ik),cc_params)
            Gedge%ret(1:itime) = Gedge%ret(1:itime)  + wt(ik)*Gk(ik)%ret(itime,1:itime)
            Gedge%less(1:itime)= Gedge%less(1:itime) + wt(ik)*Gk(ik)%less(itime,1:itime)
@@ -140,29 +143,16 @@ program neqDMFT
      call plot_kb_contour_gf("G0",Gwf,cc_params)
 
      !EVALUATE AND PRINT THE RESULTS OF THE CALCULATION
-     call measure_observables(Gloc,Sigma,cc_params)
+     call measure_observables(Gloc,Gk(:),Sigma,cc_params)
      forall(ik=1:Lk)nk(itime,ik)=dimag(Gk(ik)%less(itime,itime))
   enddo
 
 
   !EVALUATE AND PRINT THE RESULTS OF THE CALCULATION
-  allocate(Jloc(cc_params%Ntime))
   allocate(ndens(0:Nx,0:Nx,cc_params%Ntime))
-  Jloc=Vzero
-  do ik=1,Lk
-     ix=ik2ix(ik);iy=ik2iy(ik)
-     do i=1,cc_params%Ntime
-        Ak      = Afield(cc_params%t(i),Ek)
-        kt      = kgrid(ix,iy)-Ak
-        Jk      = nk(i,ik)*square_lattice_velocity(kt)
-        Jloc(i) = Jloc(i) +  wt(ik)*Jk
-     enddo
-  enddo
-
   forall(i=1:cc_params%Ntime,ik=1:Lk)nDens(ik2ix(ik),ik2iy(ik),i)=nk(i,ik)
   call splot3d("3dFSVSpiVSt.plot",kgrid(0:Nx,0)%x,kgrid(0,0:Nx)%y,nDens(0:Nx,0:Nx,:))
   call splot3d("nkVSepsikVStime.plot",cc_params%t,epsik,nk)
-  call splot("JlocVStime.plot",cc_params%t,Jloc%x,Jloc%y)
 
 
   print*,"BRAVO"
@@ -181,12 +171,15 @@ contains
     type(kb_contour_gf)                 :: g
     type(kb_contour_gf)                 :: self
     type(kb_contour_params)             :: params
+
     real(8)                             :: wm,res,ims
     logical                             :: bool
     integer                             :: i,j,k,ik,unit,len,N,L,Lf,Lk
     complex(8)                          :: zeta
     complex(8)                          :: Self_gtr
     complex(8),allocatable,dimension(:) :: SxG
+    real(8),dimension(:),allocatable    :: ftau,stau
+    !
     Lk=size(gk)
     if(.not.g0%status)stop "init_functions: g0 is not allocated"
     if(.not.g%status)stop "init_functions: g is not allocated"
@@ -227,7 +220,9 @@ contains
     endif
     !
     !INITIALIZE THE WEISS FIELD G0^{x=M,<,R,\lmix}
-    call fftgf_iw2tau(g0%iw,g0%mats(0:),params%beta)
+    allocate(ftau(0:Lf),stau(0:Lf))
+    call fftgf_iw2tau(g0%iw,ftau(0:),params%beta)
+    call extract_gtau(ftau,g0%mats)
     g0%less(1,1) = -xi*g0%mats(L)
     g0%ret(1,1)  = -xi
     forall(i=0:L)g0%lmix(1,i)=-xi*g0%mats(L-i)
@@ -239,17 +234,21 @@ contains
     ! self^>(0,0) = i^3*U*U*G0(0+)*G0(0-)*G0(0+)
     ! self^\lmix(0,t) = i^3*U*U0*G0(-t)*G0(t)*G0(-t)
     ! self^R(0,0) = self^> - self^<
-    do j=0,L
-       Self%mats(j) = Ui*Ui*g0%mats(j)*g0%mats(L-j)*g0%mats(j)
+    do j=0,Lf
+       stau(j) = Ui*Ui*ftau(j)*ftau(Lf-j)*ftau(j)
     end do
-    call fftgf_tau2iw(Self%mats(0:),Self%iw,beta)
+    call extract_gtau(stau,Self%mats)
+    call fftgf_tau2iw(stau,Self%iw,beta)
     Self%less(1,1)=(xi**3)*U*U*g0%mats(L)*g0%mats(0)*g0%mats(L)
     Self_gtr      =(xi**3)*U*U*g0%mats(0)*g0%mats(L)*g0%mats(0)
     do j=0,L
        Self%lmix(1,j)=(xi**3)*U*Ui*g0%mats(L-j)*g0%mats(j)*g0%mats(L-j)
     end do
     Self%ret(1,1) = Self_gtr - Self%less(1,1)
+    deallocate(ftau,stau)
     !   
+    G%mats=0.d0
+    G%iw = zero
     do ik=1,Lk 
        call setup_initial_conditions(self,gk(ik),dgk(ik),ik,params)
        G%mats(0:)  = G%mats(0:)  + wt(ik)*gk(ik)%mats(0:)
@@ -268,15 +267,17 @@ contains
     type(kb_contour_dgf)                :: dGk
     integer                             :: ik
     type(kb_contour_params)             :: params
-    integer                             :: i,j,k,Ltau
-    real(8)                             :: nktmp
+    integer                             :: i,j,k,Ltau,Lf
     complex(8),allocatable,dimension(:) :: SxG
+    real(8),dimension(:),allocatable    :: ftau
     Ltau  = params%Ntau
+    Lf    = params%Lf
     Gk%iw = one/(xi*params%wm - epsik(ik) - self%iw)          !get G_k(iw) 
     !
-    call fftgf_iw2tau(Gk%iw,Gk%mats(0:),beta)        !get G_k(tau)
-    nktmp = -Gk%mats(Ltau)                           !n(k,t=0)=-G^M_k(beta)=G^M_k(0-)
-    Gk%less(1,1) =  xi*nktmp                         !get G^<_k(0,0)= xi*G^M_k(0-)
+    allocate(ftau(0:Lf))
+    call fftgf_iw2tau(Gk%iw,ftau(0:),beta)           !get G_k(tau)
+    call extract_gtau(ftau,Gk%mats)
+    Gk%less(1,1) = -xi*Gk%mats(Ltau)                 !get G^<_k(0,0)= xi*G^M_k(0-)
     Gk%ret(1,1)  = -xi                               !get G^R_k(0,0)=-xi
     forall(i=0:Ltau)Gk%lmix(1,i)=-xi*Gk%mats(Ltau-i) !get G^\lmix_k(0,tau)=xi*G_k(tau<0)=-xi*G_k(beta-tau>0)
     !Derivatives
@@ -300,6 +301,7 @@ contains
        end do
        dGk%lmix(j)=dGk%lmix(j)-xi*params%dtau*kb_trapz(SxG(0:),j,Ltau) 
     enddo
+    deallocate(SxG,ftau)
   end subroutine setup_initial_conditions
 
 
@@ -397,19 +399,17 @@ contains
 
 
 
-  function Hamkt(ik,N,params) result(hk)
+  function Hamkt(ik,it,params) result(hk)
     integer                 :: ik,N
     type(kb_contour_params) :: params
     integer                 :: ix,iy,it
     type(vect2D)            :: kt,Ak
-    complex(8)              :: hk(N)
-    ix  = ik2ix(ik)
-    iy  = ik2iy(ik)
-    do it=1,N
-       Ak = Afield(params%t(it),Ek)
-       kt = kgrid(ix,iy) - Ak
-       hk(it)= one*square_lattice_dispersion(kt)
-    enddo
+    complex(8)              :: hk
+    ix = ik2ix(ik)
+    iy = ik2iy(ik)
+    Ak = Afield(params%t(it),Ek)
+    kt = kgrid(ix,iy) - Ak
+    hk = one*square_lattice_dispersion(kt)
   end function Hamkt
 
 
@@ -455,13 +455,20 @@ contains
   !+-------------------------------------------------------------------+
   !PURPOSE: measure some observables and print them
   !+-------------------------------------------------------------------+
-  subroutine measure_observables(g,self,params)
-    type(kb_contour_gf)     :: g
-    type(kb_contour_gf)     :: self
-    type(kb_contour_params) :: params
-    integer                 :: unit,itime
-    real(8)                 :: dens,docc,ekin,epot,etot
+  subroutine measure_observables(g,gk,self,params)
+    type(kb_contour_gf)                   :: g
+    type(kb_contour_gf)                   :: gk(:)
+    type(kb_contour_gf)                   :: self
+    type(kb_contour_params)               :: params
+    integer                               :: unit,itime,Lk,ix,iy,ik
+    type(vect2D)                          :: kt,Ak,Jloc
+    real(8)                               :: dens,docc,ekin,epot,etot,nk
+    Lk=size(gk)
     itime = params%Nt
+    unit = free_unit()
+    open(unit,file="columns.plot")
+    write(unit,"(8A20)")"time","Jx","Docc","Jy","n","Ekin","Epot","Etot"
+    close(unit)
     unit = free_unit()
     open(unit,file="observables.plot",position="append")
     dens = measure_dens(g,self,params)
@@ -469,7 +476,16 @@ contains
     ekin = measure_ekin(g,self,params)
     epot = measure_epot(g,self,params)
     etot = ekin + epot
-    write(unit,"(6F20.12)")params%t(itime),dens,docc,ekin,epot,etot
+    Jloc=Vzero
+    do ik=1,Lk
+       ix=ik2ix(ik)
+       iy=ik2iy(ik)
+       nk = dimag(Gk(ik)%less(itime,itime))
+       Ak   = Afield(cc_params%t(itime),Ek)
+       kt   = kgrid(ix,iy) - Ak
+       Jloc = Jloc +  wt(ik)*nk*square_lattice_velocity(kt)
+    enddo
+    write(unit,"(8F20.12)")params%t(itime),Jloc%x,docc,Jloc%y,dens,ekin,epot,etot
     close(unit)
   end subroutine measure_observables
 
@@ -499,22 +515,29 @@ contains
     type(kb_contour_gf)                 :: g
     type(kb_contour_gf)                 :: self
     type(kb_contour_params)             :: params
-    real(8)                             :: docc
-    integer                             :: i,k,j,N,L
+    real(8)                             :: docc,epot
+    integer                             :: i,k,j,N,L,Lf
     complex(8),dimension(:),allocatable :: SxG
     real(8)                             :: nt
     N = params%Nt
     L = params%Ntau
+    Lf= params%Lf
     !
     nt   = dimag(G%less(N,N))
     allocate(SxG(0:max(N,L)))
     docc = nt**2
     if(N==1)then
        if(ui/=0.d0)then
-          do k=0,L
-             SxG(k)=Self%mats(L-i)*G%mats(i)
-          end do
-          docc=docc-1.d0/Ui*params%dtau*kb_trapz(SxG(0:),0,L)
+          epot=0.d0
+          do i=1,L
+             epot=epot+dreal(self%iw(i)*g%iw(i))
+          enddo
+          epot=2.d0*epot/beta
+          docc=epot/Ui + 0.5d0*nt*2.d0 - 0.25d0
+          ! do k=0,L
+          !    SxG(k)=Self%mats(L-i)*G%mats(i)
+          ! end do
+          ! docc=docc-1.d0/Ui*params%dtau*kb_trapz(SxG(0:),0,L)
        endif
     else
        if(u/=0.d0)then
@@ -599,6 +622,28 @@ contains
        epot = U*(docc - nt + 0.25d0)
     endif
   end function measure_epot
+
+
+
+  subroutine extract_gtau(g,gred)
+    real(8),dimension(0:) :: g
+    real(8),dimension(0:) :: gred
+    integer               :: N,Nred
+    integer               :: i,ip
+    real(8)               :: p,mismatch
+    N   =size(g)-1
+    Nred=size(gred)-1
+    gred(0)=g(0)
+    ! if(g(0) > 0.d0) gred(Nred)=1.d0-g(0)
+    ! if(g(0) < 0.d0) gred(Nred)=-(g(0)+1.d0)
+    gred(Nred)=g(N)
+    mismatch=dble(N)/dble(Nred)
+    do i=1,Nred-1
+       p=dble(i)*mismatch
+       ip=int(p)
+       gred(i)=g(ip)
+    enddo
+  end subroutine extract_gtau
 
 
 end PROGRAM neqDMFT
