@@ -85,17 +85,6 @@ program neqDMFT
      enddo
   enddo
 
-  ! !<DEBUG
-  ! call plot_kb_contour_gf("Sigma",Sigma,cc_params)
-  ! call plot_kb_contour_gf("Gloc",Gloc,cc_params)
-  ! call plot_kb_contour_gf("G0",Gwf,cc_params)
-  ! call splot("init_nkVSepsik.debug",epsik,nk(1,:))
-  ! do ik=1,Lk
-  !    call splot("init_Gk_mats_tau.debug",cc_params%tau(0:),Gk(ik)%mats(0:),append=.true.)
-  !    call splot("init_dGk_mats_tau.debug",cc_params%tau(0:),dGk(ik)%lmix(0:),append=.true.)
-  ! enddo
-  ! !>DEBUG
-
 
 
   !START THE TIME_STEP LOOP  1<t<=Nt
@@ -364,33 +353,10 @@ contains
     N   = params%Nt                 !<== work with the ACTUAL size of the contour
     L   = params%Ntau
     !
-    ! allocate(Sigma_gtr(N,N))
-    ! Sigma_gtr=zero
-    ! !
-    ! !GET SIGMA TO SECOND ORDER IN U:
-    ! !Vertical edge
-    ! do j=1,N
-    !    Sigma%less(N,j)= U*U*G0%less(N,j)*(G0%less(j,N)-conjg(G0%ret(N,j)))*G0%less(N,j)
-    !    Sigma_gtr(N,j) = U*U*(G0%less(N,j)+G0%ret(N,j))*G0%less(j,N)*(G0%less(N,j)+G0%ret(N,j))
-    ! end do
-    ! !Horizontal edge
-    ! do i=1,N-1
-    !    Sigma%less(i,N)= U*U*G0%less(i,N)*(G0%less(N,i)+G0%ret(N,i))*G0%less(i,N)
-    !    !Sigma_gtr(i,N) = U*U*(G0%less(i,N)-conjg(G0%ret(N,i)))*G0%less(N,i)*(G0%less(i,N)-conjg(G0%ret(N,i)))
-    ! end do
-    ! !Imaginary time edge:
-    ! forall(i=0:L)Sigma%lmix(N,i) = U*Ui*G0%lmix(N,i)*(conjg(G0%lmix(N,L-i)))*G0%lmix(N,i)
-    ! forall(j=1:N)Sigma%ret(N,j)  = Sigma_gtr(N,j) - Sigma%less(N,j)
-
-
     allocate(G0_gtr(N,N),Sigma_gtr(N,N))
-    do j=1,N
-       G0_gtr(N,j)=G0%less(N,j)+ G0%ret(N,j)
-    end do
-    do i=1,N-1
-       G0_gtr(i,N)=G0%less(i,n)-conjg(G0%ret(N,i))
-    end do
-    !
+    G0_gtr(N,1:N)=G0%less(N,1:N)+ G0%ret(N,1:N)
+    G0_gtr(1:N-1,N)=G0%less(1:N-1,n)-conjg(G0%ret(N,1:N-1))
+          !
     !Vertical edge
     do j=1,N
        Sigma%less(N,j)= U*U*G0%less(N,j)*G0_gtr(j,N)*G0%less(N,j)
