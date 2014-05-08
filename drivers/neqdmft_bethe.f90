@@ -1,5 +1,9 @@
 !###################################################################
 !PURPOSE  : Solve quantum quench dynamic in the 1-band Bethe lattice 
+!THIS VERSION OF THE CODE  FOR THE BETHE LATTICE USES THE 
+!DIRECT SELF-CONSISTENCY RELATION. MANY ROUTINES ARE DIFFERENT 
+!AND STORED DIRECTLY HERE IN THE CODE.
+!THIS VERSION IS USED FOR TEST REFERENCE
 !AUTHORS  : Adriano Amaricci 
 !###################################################################
 program neqDMFT
