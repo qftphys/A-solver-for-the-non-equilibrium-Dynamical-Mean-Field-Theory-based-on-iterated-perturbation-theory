@@ -75,7 +75,6 @@ program neqDMFT
      dGk(ik)=zero
      dGk_old(ik)=zero
   end do
-  call allocate_kb_contour_dgf(Gedge,cc_params)
   allocate(ham(cc_params%Ntime))
   allocate(nk(cc_params%Ntime,Lk))
 

@@ -56,7 +56,7 @@ MODULE NEQ_VARS_GLOBAL
 
   !CONTAINER FOR THE CONTOUR PARAMETERS 
   !=========================================================  
-  type(kb_contour_params)                :: cc_params
+  type(kb_contour_params)                :: cc_params 
 
 
   !LATTICE (weight & dispersion) ARRAYS:
