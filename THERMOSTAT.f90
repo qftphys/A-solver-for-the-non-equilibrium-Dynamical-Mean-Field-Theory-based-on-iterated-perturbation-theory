@@ -2,8 +2,15 @@
 !     PROGRAM  : BUILD THERMOSTATING BATHS
 !     AUTHORS  : Adriano Amaricci
 !###############################################################
-module NEQ_THERMOSTAT
+module THERMOSTAT
+  USE NEQ_CONTOUR
+  USE NEQ_CONTOUR_GF
   USE NEQ_VARS_GLOBAL
+  USE NEQ_INPUT_VARS
+  USE CONSTANTS
+  USE FUNCTIONS
+  USE IOTOOLS
+  USE ARRAYS
   implicit none
   private
   real(8),allocatable,dimension(:) :: bath_dens,wfreq
@@ -19,7 +26,7 @@ contains
   subroutine get_thermostat_bath(S0,params)
     type(kb_contour_gf)                   :: S0
     type(kb_contour_params)               :: params
-    integer                               :: N,L
+    integer                               :: N,L,Liw
     integer                               :: iw,i,j,k,ints
     real(8)                               :: en,w,dw,wmax
     real(8)                               :: ngtr,nless,arg,Vhopping
@@ -29,16 +36,16 @@ contains
 
     if(.not.params%status)stop "thermostat/get_thermostat_bath: params not allocated. "
     if(.not.S0%status)stop "thermostat/get_thermostat_bath: S0 not allocated. "
-    N = params%Ntime      !<== work with the MAX size of the contour
-    L = params%Ntau
+    N   = params%Ntime      !<== work with the MAX size of the contour
+    L   = params%Ntau
 
     write(*,"(A)")"Bath coupling is:"//txtfy(Vbath)
     Vhopping=sqrt(Vbath*2.d0*Wbath)
     write(*,"(A)")"Bath hopping, width are:"//reg(txtfy(Vhopping))//","//reg(txtfy(2.d0*Wbath))
 
-    allocate(bath_dens(Lfreq),wfreq(Lfreq))
+    allocate(bath_dens(Lbath),wfreq(Lbath))
     wmax  = Wbath
-    wfreq = linspace(-wmax,wmax,Lfreq,mesh=dw)
+    wfreq = linspace(-wmax,wmax,Lbath,mesh=dw)
     select case(reg(bath_type))
     case("bethe")
        call get_bath_bethe_dos()
@@ -50,12 +57,12 @@ contains
        call get_bath_pgflat_dos()
     case("gapflat")
        wmax  = Wbath+Wgap       !2.d0*Wbath+Wgap
-       wfreq = linspace(-wmax,wmax,L,mesh=dw)
+       wfreq = linspace(-wmax,wmax,Lbath,mesh=dw)
        call get_bath_gapflat_dos()
     case default
-       call abort("Bath type:"//reg(bath_type)//" not supported.")
+       stop "Bath type not supported"
     end select
-    call splot("DOSbath.plot",wfreq,bath_dens,append=.true.)
+    call splot("DOSbath.plot",wfreq,bath_dens)
 
 
     !Bath self-energies:
@@ -64,7 +71,7 @@ contains
     S0   = zero
     S0gtr= zero
     if(Vbath==0.d0)return
-    do iw=1,Lfreq
+    do iw=1,Lbath
        en   = wfreq(iw)
        nless= fermi(en,beta)
        ngtr = fermi(en,beta)-1.d0 !it absorbs the minus sign of the greater functions
@@ -77,7 +84,7 @@ contains
           enddo
           !Lmix component:
           if(en>=0.d0)then
-             do j=0,L
+             do j=1,L
                 if(beta*en>20.d0)then
                    peso=exp(-xi*en*params%t(i))*exp(-en*(beta-params%tau(j)))
                 else
@@ -86,7 +93,7 @@ contains
                 S0%lmix(i,j) = S0%lmix(i,j) + xi*Vhopping**2*peso*bath_dens(iw)*dw
              enddo
           else
-             do j=0,L
+             do j=1,L
                 if(beta*en<-20.d0)then
                    peso=exp(-xi*en*params%t(i))*exp(en*params%tau(j))
                 else
@@ -116,7 +123,7 @@ contains
   subroutine get_bath_flat_dos()
     integer    :: i
     real(8)    :: w
-    do i=1,Lfreq
+    do i=1,Lbath
        w=wfreq(i)
        bath_dens(i)= step(Wbath-abs(w))/(2.d0*Wbath)
     enddo
@@ -126,7 +133,7 @@ contains
     integer    :: i
     real(8)    :: w,norm
     norm=(Walpha+1.d0)/(2.d0*Wbath**(Walpha+1.d0))
-    do i=1,Lfreq
+    do i=1,Lbath
        w=wfreq(i)
        if(abs(w)>wbath)then
           bath_dens(i)=0.d0
@@ -140,7 +147,7 @@ contains
     integer    :: i
     real(8)    :: w,rho
     rho=1.d0/2.d0/(Wbath)!-Wgap)
-    do i=1,Lfreq
+    do i=1,Lbath
        w=wfreq(i)
        if(abs(w)<Wbath+Wgap.AND.abs(w)>Wgap)then
           bath_dens(i)=rho
@@ -170,7 +177,7 @@ contains
     integer    :: i,ik
     real(8)    :: w,sig,alpha
     complex(8) :: gf,zeta
-    do i=1,Lfreq
+    do i=1,Lbath
        w=wfreq(i)
        zeta=cmplx(w,eps,8)
        gf=gfbether(w,zeta,wbath/2.d0)
@@ -186,5 +193,5 @@ contains
 
 
 
-end module NEQ_THERMOSTAT
+end module THERMOSTAT
 

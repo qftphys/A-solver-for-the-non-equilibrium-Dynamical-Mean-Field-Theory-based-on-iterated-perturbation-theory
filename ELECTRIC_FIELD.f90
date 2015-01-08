@@ -1,14 +1,16 @@
-!#####################################################################
-!     PURPOSE  : Function for the Electric field vector potential
-!     AUTHORS  : Adriano Amaricci
-!#####################################################################
 MODULE ELECTRIC_FIELD
   USE NEQ_VARS_GLOBAL
+  USE NEQ_INPUT_VARS
+  USE CONSTANTS
+  USE DERIVATE
+  USE IOTOOLS
+  USE FUNCTIONS
   implicit none
   private
   public :: Afield
   public :: set_efield_vector
   public :: print_field
+
 contains
 
   !+------------------------------------------------------------+
@@ -25,27 +27,27 @@ contains
        Ex=Ex/modulo
        Ey=Ey/modulo
     endif
-    Ek%x=Ex;Ek%y=Ey
-    call msg("|E|=E0="//trim(txtfy(Efield/modulo)),id=0)
+    Ek = [Ex,Ey]
+    write(*,*)"|E|=E0="//trim(txtfy(Efield/modulo))
     check=.false.
     check=field_type=="dc".OR.&
          field_type=="ac".OR.&
          field_type=="acdc".OR.&
          field_type=="pulse".OR.&
          field_type=="ramp"
-    if(.not.check)call error("ELECTRIC_FIELD/Afield: wrong field_type. set:dc,ac,acdc,pulse,ramp")
+    if(.not.check)stop "ELECTRIC_FIELD/set_efield_vector: wrong field_type. set:dc,ac,acdc,pulse,ramp"
   end subroutine set_efield_vector
 
 
   !+------------------------------------------------------------+
   !PURPOSE : 
   !+------------------------------------------------------------+
-  pure function Afield(t,E)
-    type(vect2D),intent(in) :: E
-    real(8),intent(in)      :: t
-    real(8)                 :: ftime,tau0,tau1
-    type(vect2D)            :: Afield
-    complex(8)              :: zp,zm
+  function Afield(t,E)
+    real(8),dimension(:),intent(in) :: E
+    real(8),intent(in)              :: t
+    real(8)                         :: ftime,tau0,tau1
+    real(8),dimension(size(E))      :: Afield
+    complex(8)                      :: zp,zm
 
     select case(field_type)
     case ("dc")                !DC ELECTRIC FIELD:
@@ -70,9 +72,9 @@ contains
        ! zm=cmplx(t-t0,-tau1**2*w0,8)/(sqrt(2.d0)*tau1)
        ! ftime =-real(sqrt(pi/2.d0)/2.d0*tau1*exp(-(tau1*w0)**2/2.d0)*(zerf(zm)+zerf(zp)),8)
        tau0 = Ncycles/Omega0
-       zp = cmplx((t-t0)/tau0 , tau0*Omega0*pi/2.d0)
-       zm = cmplx((t-t0)/tau0 ,-tau0*Omega0*pi/2.d0)
-       ftime = -dimag(sqrt(pi)*tau0/4.d0*exp(-0.25d0*(tau0*Omega0*pi)**2)*(zerf(zp)-zerf(zm)))
+       zp = cmplx((t-t0)/tau0 , tau0*Omega0*pi/2.d0,8)
+       zm = cmplx((t-t0)/tau0 ,-tau0*Omega0*pi/2.d0,8)
+       ftime = -sqrt(pi)*tau0/4.d0*exp(-0.25d0*(tau0*Omega0*pi)**2)*dimag(zerf(zp)-zerf(zm))
        Afield=E*Efield*ftime       !A(t) = E0*F(t)*(e_x + e_y)
 
     case("ramp")                !RAMP TO CONSTANT DC-FIELD:
@@ -89,14 +91,14 @@ contains
 
 
   subroutine print_field(t)
-    real(8),dimension(:) :: t
-    integer              :: i
-    type(vect2D)         :: A
+    real(8),dimension(:)       :: t
+    integer                    :: i
+    real(8),dimension(2)       :: A
     real(8),dimension(size(t)) :: Ax,Ay,Ex,Ey
     do i=1,size(t)
        A=Afield(t(i),Ek)
-       Ax(i)=A%x
-       Ay(i)=A%y
+       Ax(i)=A(1)
+       Ay(i)=A(2)
     enddo
     Ex = deriv(Ax,dt)
     Ey = deriv(Ay,dt)
@@ -108,13 +110,8 @@ contains
     enddo
     close(10)
     close(11)
-    if(field_type=="ac")call msg("Root condition: "//trim(txtfy(bessel_j0(Efield/Omega0))))
+    if(field_type=="ac")write(*,*)"Root condition: "//trim(txtfy(bessel_j0(Efield/Omega0)))
   end subroutine print_field
-
-
-  !***************************************************************
-  !***************************************************************
-  !***************************************************************
 
 
 end MODULE ELECTRIC_FIELD
