@@ -9,10 +9,5 @@ MODULE NEQ_VARS_GLOBAL
   !=========================================================  
   type(kb_contour_params)                :: cc_params 
 
-
-  !ELECTRIC FIELD
-  !=========================================================  
-  real(8),dimension(2)                   :: Ak,Ek         !Electric field vector potential and vector
-
 end module NEQ_VARS_GLOBAL
 

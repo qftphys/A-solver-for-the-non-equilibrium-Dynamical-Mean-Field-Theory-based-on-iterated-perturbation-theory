@@ -12,27 +12,27 @@ MODULE NEQ_CONTOUR_GF
   ! KADANOFF-BAYM CONTOUR GREEN'S FUNCTIONS:
   !====================================================
   type,public                          :: kb_contour_gf
-     complex(8),dimension(:,:),pointer :: less
-     complex(8),dimension(:,:),pointer :: ret
-     complex(8),dimension(:,:),pointer :: lmix
-     real(8),dimension(:),pointer      :: mats
-     complex(8),dimension(:),pointer   :: iw
-     logical                           :: status=.false.
-     integer                           :: N=0
-     integer                           :: L=0
-     integer                           :: LF=0
+     complex(8),dimension(:,:),allocatable :: less
+     complex(8),dimension(:,:),allocatable :: ret
+     complex(8),dimension(:,:),allocatable :: lmix
+     real(8),dimension(:),allocatable      :: mats
+     complex(8),dimension(:),allocatable   :: iw
+     logical                               :: status=.false.
+     integer                               :: N=0
+     integer                               :: L=0
+     integer                               :: LF=0
   end type kb_contour_gf
 
 
   ! KADANOFF-BAYM CONTOUR GREEN'S FUNCTIONS DERIVATIVE
   !====================================================
   type,public                          :: kb_contour_dgf
-     complex(8),dimension(:),pointer   :: less,gtr
-     complex(8),dimension(:),pointer   :: ret
-     complex(8),dimension(:),pointer   :: lmix
-     logical                           :: status=.false.
-     integer                           :: N=0
-     integer                           :: L=0
+     complex(8),dimension(:),allocatable :: less,gtr
+     complex(8),dimension(:),allocatable :: ret
+     complex(8),dimension(:),allocatable :: lmix
+     logical                             :: status=.false.
+     integer                             :: N=0
+     integer                             :: L=0
   end type kb_contour_dgf
 
 
@@ -106,7 +106,10 @@ contains
     type(kb_contour_gf)     :: G
     type(kb_contour_params) :: params
     integer                 :: i,j,N,L,Lf
-    nullify(G%less,G%ret,G%lmix,G%mats)
+    if(allocated(G%less))deallocate(G%less)
+    if(allocated(G%ret))deallocate(G%ret)
+    if(allocated(G%lmix))deallocate(G%lmix)
+    if(allocated(G%mats))deallocate(G%mats)
     N = params%Ntime            !<== allocate at maximum time
     L = params%Ntau
     Lf= params%Niw
@@ -126,7 +129,9 @@ contains
     type(kb_contour_params) :: params
     integer                 :: i,j,N,L
     logical,optional        :: wgtr
-    nullify(dG%less,dG%ret,dG%lmix)
+    if(allocated(dG%less))deallocate(dG%less)
+    if(allocated(dG%ret))deallocate(dG%ret)
+    if(allocated(dG%lmix))deallocate(dG%lmix)
     N=params%Ntime           !<== allocate at maximum time
     L=params%Ntau
     dG%N=N
@@ -159,7 +164,7 @@ contains
     type(kb_contour_dgf) :: dG
     if(.not.dG%status)stop "contour_gf/deallocate_kb_contour_dgf: dG not allocated"
     deallocate(dG%less,dG%ret,dG%lmix)
-    if(associated(dG%gtr))deallocate(dG%gtr)
+    if(allocated(dG%gtr))deallocate(dG%gtr)
     dG%N=0
     dG%L=0
     dG%status=.false.
@@ -370,11 +375,6 @@ contains
 
 
 
-
-
-
-
-
   !======= PLOT ======= 
   subroutine plot_kb_contour_gf(file,G,params)
     character(len=*)        :: file
@@ -383,11 +383,11 @@ contains
     integer                 :: Nt
     if(.not.G%status)stop "neq_contour_gf/plot_kb_contour_gf: G is not allocated" 
     Nt=params%Itime
-    call splot3d(reg(file)//"_less_t_t.plot",params%t(:Nt),params%t(:Nt),G%less(:Nt,:Nt))
-    call splot3d(reg(file)//"_ret_t_t.plot",params%t(:Nt),params%t(:Nt),G%ret(:Nt,:Nt))
-    call splot3d(reg(file)//"_lmix_t_tau.plot",params%t(:Nt),params%tau(:),G%lmix(:Nt,:))
-    call splot(reg(file)//"_mats_tau.plot",params%tau(:),G%mats(:))
-    call splot(reg(file)//"_mats_iw.plot",params%wm(:),G%iw(:))
+    call splot3d(reg(file)//"_less_t_t",params%t(:Nt),params%t(:Nt),G%less(:Nt,:Nt))
+    call splot3d(reg(file)//"_ret_t_t",params%t(:Nt),params%t(:Nt),G%ret(:Nt,:Nt))
+    call splot3d(reg(file)//"_lmix_t_tau",params%t(:Nt),params%tau(:),G%lmix(:Nt,:))
+    call splot(reg(file)//"_mats_tau",params%tau(:),G%mats(:))
+    call splot(reg(file)//"_mats_iw",params%wm(:),G%iw(:))
   end subroutine plot_kb_contour_gf
   !
   subroutine plot_kb_contour_dgf(file,dG,params)
@@ -397,9 +397,9 @@ contains
     integer                 :: Nt
     if(.not.dG%status)stop "neq_contour_gf/plot_kb_contour_gf: G is not allocated" 
     Nt=params%Itime
-    call splot(reg(file)//"_less_t.plot",params%t(:Nt),dG%less(:Nt))
-    call splot(reg(file)//"_ret_t.plot",params%t(:Nt),dG%ret(:Nt))
-    call splot(reg(file)//"_lmix_tau.plot",params%tau(:),dG%lmix(:))
+    call splot(reg(file)//"_less_t",params%t(:Nt),dG%less(:Nt))
+    call splot(reg(file)//"_ret_t",params%t(:Nt),dG%ret(:Nt))
+    call splot(reg(file)//"_lmix_tau",params%tau(:),dG%lmix(:))
   end subroutine plot_kb_contour_dgf
 
 

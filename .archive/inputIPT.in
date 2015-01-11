@@ -1,0 +1,9 @@
+0.0005d0,1.d0,2.8d0
+20,1
+
+dE,d,u
+nloop,imet
+
+dE frequency mesh
+d  half-bandwidth
+u  hubbard interaction
