@@ -1,0 +1,75 @@
+  !Embed the built G_loc^Ret,Adv,<(nstep,nstep) into the LxL matrix
+  allocate(locGret_large(0:L,0:L),&
+       locGadv_large(0:L,0:L),&
+       locGless_large(0:L,0:L),&
+       locGlceil_large(0:L,0:Ltau))
+  locGret_large=zero
+  locGadv_large=zero
+  locGless_large=zero
+  locGlceil_large=zero
+  do i=0,L
+     locGret_large(i,i)=one
+     locGadv_large(i,i)=one
+     locGless_large(i,i)=one
+  enddo
+
+  locGret_large(0:nstep,0:nstep) =locGret  !(0:nstep,0:nstep)
+  locGadv_large(0:nstep,0:nstep) =conjg(transpose(locGret))  !(0:nstep,0:nstep)
+  locGless_large(0:nstep,0:nstep)=locGless !(0:nstep,0:nstep)
+  locGlceil_large(0:nstep,0:Ltau)=locGlceil
+
+  allocate(Unity(0:L,0:L))
+  Unity=zero
+  do i=0,nstep
+     Unity(i,i)=one
+  enddo
+
+  !Build the inverse of the operators [1+G^r.S^r], [1+S^a.G^a]
+  allocate(OBJret(0:L,0:L),OBJadv(0:L,0:L))
+  allocate(dummyOBJret(L+1,L+1),dummyOBJadv(L+1,L+1))
+
+  OBJret=Unity+matmul(locGret_large,Sret)*dt
+  call shiftFW(OBJret,dummyOBJret)
+  call InvMat(dummyOBJret,L+1) 
+  call shiftFW(dummyOBJret,OBJret)  
+
+  OBJadv=Unity+matmul(Sadv,locGadv_large)*dt
+  call shiftFW(OBJadv,dummyOBJadv)
+  call InvMat(dummyOBJadv,L+1)
+  call shiftFW(dummyOBJadv,OBJadv)
+  deallocate(dummyOBJret,dummyOBJadv)
+
+  allocate(Op1(0:L,0:L),&
+       Op2(0:L,0:L),    &
+       Op3(0:L,0:L),    &
+       Op4(0:L,0:L),    &
+       Op5(0:L,0:L))
+
+  !Op1 = Or^-1*G^<*Oa^-1
+  Op1=matmul(OBJret,matmul(locGless_large,OBJadv))*dt*dt
+
+  !Op2 = Or^-1*[G^r.S^<.G^a]*Oa^-1
+  Op2=matmul(locGret_large,matmul(Sless,locGadv_large))*dt*dt
+  Op2=matmul(OBJret,matmul(Op2,OBJadv))*dt*dt
+
+  !Op3 = Or^-1*[G^lceil.S^rceil.G^a]*Oa^-1
+  Op3=matmul(matmul(locGlceil_large,Srceil),locGadv_large)*dt*dtau
+  Op3=matmul(OBJret,matmul(Op3,OBJadv))*dt*dt
+
+  !Op4 = Or^-1*[G^r.S^lceil.G0^rceil]
+  Op4=matmul(locGret_large,matmul(Slceil,G0rceil))*dt*dtau
+  Op4=matmul(OBJret,Op4)*dt
+
+  !Op5 = Or^-1*[G^lceil.S^M.G0^rceil]
+  Op5=matmul(locGlceil_large,matmul(Smatsubara,G0rceil))*dtau*dtau
+  Op5=matmul(OBJret,Op5)*dt
+
+  G0less=Op1-Op2-Op3-Op4-Op5
+  !G0less=-real(G0less)+xi*aimag(G0less)
+  !G0less=G0less*10.d0
+  deallocate(Unity,        &
+       Op1,Op2,Op3,Op4,Op5,&
+       OBJret,OBJadv,      &
+       locGret_large,      &
+       locGadv_large,      &
+       locGless_large)

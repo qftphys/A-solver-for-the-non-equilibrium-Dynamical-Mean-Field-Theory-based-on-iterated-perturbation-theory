@@ -1,0 +1,20 @@
+&variables
+Efield	= 0.5		!Electric Field
+beta	= 100		!inverse T		 
+U     	= 2.d0 		!correlation U
+xmu	= 0.d0		!xmu=mu-U/2	
+/
+&parameters
+nloop	= 2		!# of DMFT-loop
+L	= 1024		!# of t-points in the semi-axis
+Lepsi	= 100		!# of e-points in the semi-axis
+emax	= 5.d0		!MAX e-points	
+emin	= -5.d0		!MIN e-points should be -emax
+fmesh	= 0.005d0	!mesh of the w-grid (it is an heritage)
+/
+
+
+
+
+
+
