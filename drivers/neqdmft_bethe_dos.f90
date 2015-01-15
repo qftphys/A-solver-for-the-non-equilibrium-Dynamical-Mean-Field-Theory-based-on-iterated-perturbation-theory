@@ -21,7 +21,7 @@ program neqDMFT
   real(8)                               :: de,intwt
 
   !READ THE INPUT FILE (in vars_global):
-  call parse_cmd_variable(finput,"FINPUT",default='inputNEQ.in')
+  call parse_cmd_variable(finput,"FINPUT",default='inputNEQ.conf')
   call parse_input_variable(wband,"wband",finput,default=1d0,comment="half-bandwidth W=2t")
   call parse_input_variable(Lk,"Lk",finput,default=100,comment="Number of energy levels for Bethe DOS")
   call read_input_init(trim(finput))
@@ -29,6 +29,7 @@ program neqDMFT
 
   !BUILD THE LATTICE STRUCTURE (in lib/square_lattice):
   allocate(Hk(Ntime,Lk),Wtk(Lk))
+  Hk = zero
   Hk(1,:) = linspace(-wband,wband,Lk,mesh=de)
   do i=1,Lk
      Wtk(i) = dens_bethe(dreal(Hk(1,i)),wband)
@@ -123,9 +124,6 @@ program neqDMFT
         converged = convergence_check(Gwf,cc_params)
      enddo
 
-     call plot_kb_contour_gf("Sigma",Sigma,cc_params)
-     call plot_kb_contour_gf("Gloc",Gloc,cc_params)
-     call plot_kb_contour_gf("G0",Gwf,cc_params)
 
      !EVALUATE AND PRINT THE RESULTS OF THE CALCULATION
      call neq_measure_observables(Gloc,Sigma,cc_params)
@@ -134,8 +132,10 @@ program neqDMFT
 
 
   !EVALUATE AND PRINT OTHER RESULTS OF THE CALCULATION
-  call splot3d("nkVSepsikVStime.plot",cc_params%t,dreal(Hk(1,:)),nk)
-
+  call splot3d("nkVSepsikVStime.ipt",cc_params%t,dreal(Hk(1,:)),nk)
+  call plot_kb_contour_gf("Sigma.ipt",Sigma,cc_params)
+  call plot_kb_contour_gf("Gloc.ipt",Gloc,cc_params)
+  call plot_kb_contour_gf("G0.ipt",Gwf,cc_params)
   print*,"BRAVO"
 
 

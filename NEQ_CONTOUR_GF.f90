@@ -629,6 +629,7 @@ contains
     G%ret(N,N)=Q%ret(N,N)
     do j=1,N-1
        G%ret(N,j)=Q%ret(N,j)
+       KxG = zero
        do s=j,N-1
           KxG(s)=K%ret(N,s)*G%ret(s,j)
        eNd do
@@ -642,6 +643,7 @@ contains
     !-------------------------------------------------------------------
     do jtau=1,L
        G%lmix(N,jtau)=Q%lmix(N,jtau)
+       KxG = zero
        do s=1,jtau
           KxG(s)=K%lmix(N,s)*G%mats(s + L-jtau)
        end do
@@ -651,6 +653,7 @@ contains
        end do
        G%lmix(N,jtau)=G%lmix(N,jtau)+dtau*kb_trapz(KxG,jtau,L)
        !
+       KxG = zero
        do s=1,N-1
           KxG(s)=K%ret(N,s)*G%lmix(s,jtau)
        end do
@@ -667,16 +670,19 @@ contains
     !-------------------------------------------------------------------
     do j=1,N-1
        G%less(N,j)=Q%less(N,j)
+       KxG = zero
        do s=1,L
           KxG(s)=K%lmix(N,s)*conjg(G%lmix(j,L-s+1))
        enddo
        G%less(N,j)=G%less(N,j) - xi*dtau*kb_trapz(KxG,1,L)
        !
+       KxG = zero
        do s=1,j
           KxG(s)=K%less(N,s)*conjg(G%ret(j,s))
        enddo
        G%less(N,j)=G%less(N,j) + dt*kb_trapz(KxG,1,j)
        !
+       KxG = zero
        do s=1,N-1
           KxG(s)=K%ret(N,s)*G%less(s,j)
        enddo
@@ -693,16 +699,19 @@ contains
     ! G^{<}(t_{n},t_{n}) <= Diagonal
     !-------------------------------------------------------------------
     G%less(N,N)=Q%less(N,N)
+    KxG = zero
     do s=1,L
        KxG(s)=K%lmix(N,s)*conjg(G%lmix(N,L-s+1))
     end do
     G%less(N,N)=G%less(N,N) - xi*dtau*kb_trapz(KxG,1,L)
     !
+    KxG = zero
     do s=1,N
        KxG(s)=K%less(N,s)*conjg(G%ret(N,s))
     end do
     G%less(N,N)=G%less(N,N)+dt*kb_trapz(KxG,1,N)
     !
+    KxG = zero
     do s=1,N-1
        KxG(s)=K%ret(N,s)*G%less(s,N)
     end do
@@ -757,6 +766,7 @@ contains
     dG_new%ret(N) = -xi*H(N)*G%ret(N,N)
     do j=1,N-1
        G%ret(N,j)=G%ret(N-1,j) + 0.5d0*dt*dG%ret(j)
+       KxG = zero
        do s=j,N-1
           KxG(s)=K%ret(N,s)*G%ret(s,j)
        enddo
@@ -773,6 +783,7 @@ contains
     !-------------------------------------------------------------------------------------
     do jtau=1,L
        G%lmix(N,jtau)=G%lmix(N-1,jtau) + 0.5d0*dt*dG%lmix(jtau)
+       KxG = zero
        do s=1,jtau
           KxG(s)=K%lmix(N,s)*G%mats(s + L-jtau)
        end do
@@ -782,6 +793,7 @@ contains
        end do
        dG_new%lmix(jtau) = dG_new%lmix(jtau) - xi*dtau*kb_trapz(KxG,jtau,L)!<= add -iQ(t)
        !
+       KxG = zero
        do s=1,N-1
           KxG(s)=K%ret(N,s)*G%lmix(s,jtau)
        end do
@@ -801,15 +813,19 @@ contains
     !-------------------------------------------------------------------------------------
     do j=1,N-1
        G%less(N,j)=G%less(N-1,j) + 0.5d0*dt*dG%less(j)
+       KxG = zero
        do s=1,L
           KxG(s)=K%lmix(N,s)*conjg(G%lmix(j,L-s+1))
        end do
        dG_new%less(j) = -xi*(-xi)*dtau*kb_trapz(KxG,1,L)
+       !
+       KxG = zero
        do s=1,j
           KxG(s)=K%less(N,s)*conjg(G%ret(j,s))
        end do
        dG_new%less(j)=dG_new%less(j) - xi*dt*kb_trapz(KxG,1,j)!<= -iQ(t)
        !
+       KxG = zero
        do s=1,N-1
           KxG(s)=K%ret(N,s)*G%less(s,j)
        end do
@@ -831,14 +847,19 @@ contains
     ! d/dt G^<(t_{N-1},t_{N})
     !-------------------------------------------------------------------------------------
     dG_less=-xi*H(N-1)*G%less(N-1,N)
+    KxG = zero
     do s=1,L
        KxG(s)=K%lmix(N-1,s)*conjg(G%lmix(N,L-s+1))
     end do
     dG_less=dG_less - xi*(-xi)*dtau*kb_trapz(KxG,1,L)
+    !
+    KxG = zero
     do s=1,N
        KxG(s)=K%less(N-1,s)*conjg(G%ret(N,s))
     end do
     dG_less=dG_less - xi*dt*kb_trapz(KxG,1,N)
+    !
+    KxG = zero
     do s=1,N-1
        KxG(s)=K%ret(N-1,s)*G%less(s,N)
     end do
@@ -847,16 +868,19 @@ contains
     !G^<(N,N), d/dt G^<(N,N)
     !-------------------------------------------------------------------------------------
     G%less(N,N)=G%less(N-1,N) + 0.5d0*dt*dG_less
+    KxG = zero
     do s=1,L
        KxG(s)=K%lmix(N,s)*conjg(G%lmix(N,L-s+1))
     end do
     dG_new%less(N) = -xi*(-xi)*dtau*kb_trapz(KxG,1,L)
     !
+    KxG = zero
     do s=1,N
        KxG(s)=K%less(N,s)*conjg(G%ret(N,s))
     end do
     dG_new%less(N) = dG_new%less(N) - xi*dt*kb_trapz(KxG,1,N)
     !
+    KxG = zero
     do s=1,N-1
        KxG(s)=K%ret(N,s)*G%less(s,N)
     end do
@@ -903,42 +927,26 @@ contains
     integer                         :: k
     real(8)                         :: sum
     sum=0.d0
-    if(ia==ib)then
-       return
-    else
-       sum=sum+0.5d0*f(ia)
-       do k=ia+1,ib-1
-          sum=sum+f(k)
-       end do
-       sum=sum+0.5d0*f(ib)
-    end if
+    if(ia==ib)return
+    sum=sum+0.5d0*f(ia)
+    do k=ia+1,ib-1
+       sum=sum+f(k)
+    end do
+    sum=sum+0.5d0*f(ib)
   end function kb_trapz_d
 
-  function kb_trapz_c(f,ia,ib,origin) result(sum)
+  function kb_trapz_c(f,ia,ib) result(sum)
     complex(8),dimension(:),intent(in) :: f
     integer,intent(in)                 :: ia, ib
     integer                            :: k
     complex(8)                         :: sum
-    logical,optional,intent(in)        :: origin
-    logical                            :: w0
-    real(8)                            :: w
-
-    w0=.true.
-    if(present(origin)) w0=origin
-
-    w = 0.5d0
-    if(.not.w0) w = 1d0
-
     sum=zero
-    if(ia==ib)then
-       return
-    else
-       sum=sum+w*f(ia)
-       do k=ia+1,ib-1
-          sum=sum+f(k)
-       end do
-       sum=sum+w*f(ib)
-    end if
+    if(ia==ib)return
+    sum=sum+0.5d0*f(ia)
+    do k=ia+1,ib-1
+       sum=sum+f(k)
+    end do
+    sum=sum+0.5d0*f(ib)
   end function kb_trapz_c
 
   function kb_half_trapz_d(f,ia,ib) result(sum)
