@@ -52,7 +52,6 @@ contains
     !
     N = params%Itime
     L = params%Ntau
-
     Lf= params%Niw
     !
     call read_equilibrium_g0(g0,params,Hk=Hk,wtk=Wtk)
@@ -150,40 +149,36 @@ contains
     type(kb_contour_dgf)                :: dGk
     real(8)                             :: Hk
     type(kb_contour_params)             :: params
-    integer                             :: i,j,k,L,Lf
+    integer                             :: i,j,k,Ltau,Lf
     real(8)                             :: nk
     complex(8)                          :: epsk
     complex(8),allocatable,dimension(:) :: SxG
-    real(8),dimension(0:3)              :: Gcoeff
-    L = params%Ntau
+    Ltau = params%Ntau
     Gk%iw   = one/(xi*params%wm - Hk - Self%iw)
-    Gcoeff  = tail_coeff_gk(uloc,0.5d0,0d0,Hk)
-    call fft_gf_iw2tau(Gk%iw,Gk%mats,beta,Gcoeff)        !get G_k(tau)
-    !                                                    !n(k,t=0)=-G^M_k(beta)=G^M_k(0-)
-    Gk%less(1,1) = -xi*Gk%mats(L)                        !get G^<_k(0,0)= xi*G^M_k(0-)
+    call fft_gf_iw2tau(Gk%iw,Gk%mats,beta)               !get G_k(tau)
+    Gk%less(1,1) = -xi*Gk%mats(Ltau)                     !get G^<_k(0,0)= xi*G^M_k(0-)=n(k,t=0)
     Gk%ret(1,1)  = -xi                                   !get G^R_k(0,0)=-xi
-    forall(i=1:L)Gk%lmix(1,i)=-xi*Gk%mats(L-i+1)         !get G^\lmix_k(0,tau)=xi*G_k(tau<0)=-xi*G_k(beta-tau>0)
+    forall(i=1:Ltau)Gk%lmix(1,i)=-xi*Gk%mats(Ltau-i+1)   !get G^\lmix_k(0,tau)=xi*G_k(tau<0)=-xi*G_k(beta-tau>0)
     !Derivatives
-    allocate(SxG(L))
+    allocate(SxG(Ltau))
     !get d/dt G_k^R = -i e(k,0)G_k^R
     dGk%ret(1)  = -xi*Hk*Gk%ret(1,1)
     !get d/dt G_k^< = -i e(k,0)G_k^< -xi(-xi)int_0^beta S^\lmix*G_k^\rmix
-    do k=1,L
-       SxG(k)=self%lmix(1,k)*conjg(Gk%lmix(1,L-k+1))
+    do k=1,Ltau
+       SxG(k)=self%lmix(1,k)*conjg(Gk%lmix(1,Ltau-k+1))
     end do
-    dGk%less(1) = -xi*Hk*Gk%less(1,1)-&
-         xi*(-xi)*params%dtau*kb_trapz(SxG,1,L) 
+    dGk%less(1) = -xi*Hk*Gk%less(1,1)-xi*(-xi)*params%dtau*kb_trapz(SxG,1,Ltau) 
     !get d/dt G_k^\lmix = -xi*e(k,0)*G_k^\lmix - xi*int_0^beta G_k^\lmix*G_k^M
     dGk%lmix(:) = -xi*Hk*Gk%lmix(1,:)
-    do j=1,L
+    do j=1,Ltau
        do k=1,j
-          SxG(k)=self%lmix(1,k)*Gk%mats(k + L-j)
+          SxG(k)=self%lmix(1,k)*Gk%mats(k + Ltau-j)
        end do
        dGk%lmix(j)=dGk%lmix(j)+xi*params%dtau*kb_trapz(SxG,1,j)
-       do k=j,L
+       do k=j,Ltau
           SxG(k)=self%lmix(1,k)*Gk%mats(k - j+1)
        end do
-       dGk%lmix(j)=dGk%lmix(j)-xi*params%dtau*kb_trapz(SxG,j,L) 
+       dGk%lmix(j)=dGk%lmix(j)-xi*params%dtau*kb_trapz(SxG,j,Ltau) 
     enddo
   end subroutine neq_setup_initial_conditions
 
@@ -300,7 +295,7 @@ contains
           print*,"read_equilibrium_g0: mu in "//reg(g0file)//"different from the input:",xmu
           stop
        endif
-       write(*,"(A)")"Header of the file:",reg(txtfy(mu)),reg(txtfy(h1)),reg(txtfy(h2)),reg(txtfy(hDC))
+       write(*,"(5A)")"Header of the file:",reg(txtfy(mu)),reg(txtfy(h1)),reg(txtfy(h2)),reg(txtfy(hDC))
        do i=1,Lf
           read(unit,*)wm,ims,res
           g0%iw(i) = dcmplx(res,ims)
@@ -309,7 +304,7 @@ contains
     else
        write(*,"(A)")"Start from Non-interacting Bethe-model G0(iw)"
        mu=xmu ; h1=0d0 ; h2=0d0 ; hDC=0d0
-       write(*,"(A)")"Header of the file:",reg(txtfy(mu)),reg(txtfy(h1)),reg(txtfy(h2)),reg(txtfy(hDC))
+       write(*,"(5A)")"Header of the file:",reg(txtfy(mu)),reg(txtfy(h1)),reg(txtfy(h2)),reg(txtfy(hDC))
        if(present(Hk))then
           if(.not.present(Wtk))stop "read_equilibrium_g0: Wtk not present"
           do i=1,Lf

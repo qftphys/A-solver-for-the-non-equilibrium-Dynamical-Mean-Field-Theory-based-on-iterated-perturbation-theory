@@ -15,10 +15,10 @@ program neqDMFT
   type(kb_contour_dgf),allocatable      :: dGk(:),dGk_old(:)
   type(kb_contour_dgf)                  :: Gedge,G0edge
   complex(8),dimension(:,:),allocatable :: Hk
-  real(8),dimension(:),allocatable      :: Wtk
+  real(8),dimension(:),allocatable      :: Epsk,Wtk
   !RESULTS:
   real(8),dimension(:,:),allocatable    :: nk
-  real(8)                               :: de,intwt
+  real(8)                               :: de
 
   !READ THE INPUT FILE (in vars_global):
   call parse_cmd_variable(finput,"FINPUT",default='inputNEQ.conf')
@@ -28,15 +28,13 @@ program neqDMFT
 
 
   !BUILD THE LATTICE STRUCTURE (in lib/square_lattice):
-  allocate(Hk(Ntime,Lk),Wtk(Lk))
-  Hk = zero
-  Hk(1,:) = linspace(-wband,wband,Lk,mesh=de)
+  allocate(Hk(Ntime,Lk),Epsk(Lk),Wtk(Lk))
+  Epsk = linspace(-wband,wband,Lk,mesh=de)
   do i=1,Lk
-     Wtk(i) = dens_bethe(dreal(Hk(1,i)),wband)
+     Wtk(i) = dens_bethe(Epsk(i),wband)
   enddo
-  call splot("DOSbethe.ipt",dreal(Hk(1,:)),Wtk)
-  intwt=sum(Wtk)*de
-  Wtk=Wtk*de/intwt
+  call splot("DOSbethe.ipt",Epsk,Wtk)
+  Wtk=Wtk/sum(Wtk)
 
 
   !BUILD TIME GRIDS AND NEQ-PARAMETERS:
@@ -66,22 +64,23 @@ program neqDMFT
   itime=1
   cc_params%Itime=itime
   Gloc = zero
-  call neq_continue_equilibirum(Gwf,Gk,dGk,Gloc,Sigma,dreal(Hk(1,:)),Wtk,cc_params)
+  call neq_continue_equilibirum(Gwf,Gk,dGk,Gloc,Sigma,Epsk,Wtk,cc_params)
   call neq_measure_observables(Gloc,Sigma,cc_params)
   do ik=1,Lk
      nk(1,ik)=dimag(Gk(ik)%less(1,1))
   enddo
-  do i=2,cc_params%Ntime
-     Hk(i,:)=Hk(1,:)
+  Hk=zero
+  do i=1,cc_params%Ntime
+     Hk(i,:)=Epsk
   enddo
 
 
   !START THE TIME_STEP LOOP  1<t<=Nt
   !AT EACH TIME_STEP PERFORM A FULL DMFT CALCULATION:
-  t_converged=.false.
-  do while(.not.t_converged.AND.itime<cc_params%Ntime)
-     itime=itime+1
-     !do itime=2,cc_params%Ntime
+  ! t_converged=.false.
+  ! do while(.not.t_converged.AND.itime<cc_params%Ntime)
+  !    itime=itime+1
+  do itime=2,cc_params%Ntime
      cc_params%Itime=itime
      print*,""
      print*,"time step=",itime

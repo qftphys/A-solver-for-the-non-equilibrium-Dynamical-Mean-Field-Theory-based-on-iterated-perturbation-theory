@@ -91,9 +91,6 @@ program neqDMFT
         converged = convergence_check(Gwf,cc_params)
         !
      enddo
-     call plot_kb_contour_gf("Sigma",Sigma,cc_params)
-     call plot_kb_contour_gf("Gloc",Gloc,cc_params)
-     call plot_kb_contour_gf("G0",Gwf,cc_params)
 
      !EVALUATE AND PRINT THE RESULTS OF THE CALCULATION
      call neq_measure_observables(Gloc,Sigma,cc_params)
@@ -115,7 +112,10 @@ program neqDMFT
      enddo
      forall(itime=1:cc_params%Ntime)nk(itime,ik)=dimag(Gwf%less(itime,itime))
   enddo
-  call splot3d("nkVSepsikVStime.plot",cc_params%t,Hk,nk,wlines=.true.)
+  call splot3d("nkVSepsikVStime.ipt",cc_params%t,Hk,nk,wlines=.true.)
+  call plot_kb_contour_gf("Sigma.ipt",Sigma,cc_params)
+  call plot_kb_contour_gf("Gloc.ipt",Gloc,cc_params)
+  call plot_kb_contour_gf("G0.ipt",Gwf,cc_params)
 
 
 contains

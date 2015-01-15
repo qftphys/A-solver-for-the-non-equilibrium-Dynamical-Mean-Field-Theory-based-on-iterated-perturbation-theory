@@ -458,7 +458,7 @@ contains
     !               +\int_0^{t} ds A^R(t,s)*B^\lmix(s,tau')
     !               = I1 + I2
     !-------------------------------------------------------------------
-    C%lmix(N,L)=zero
+    C%lmix(N,:)=zero
     do jtau=1,L
        !I1:
        AxB = zero

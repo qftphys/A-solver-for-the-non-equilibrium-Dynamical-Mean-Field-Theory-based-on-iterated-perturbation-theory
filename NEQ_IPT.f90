@@ -44,6 +44,7 @@ contains
     Scoeff  = tail_coeff_sigma(uloc,0.5d0)
     call fft_sigma_tau2iw(Self%iw,Self%mats,beta,Scoeff)
     Self%iw = xi*dimag(self%iw) !!ACTHUNG: imposing half-filling symmetry
+    if(sum(Self%mats)==0d0)Self%iw=zero
     Self%less(1,1)=(xi**3)*Uloc*Uloc*g0%mats(L)*g0%mats(1)*g0%mats(L)
     Self_gtr      =(xi**3)*Uloc*Uloc*g0%mats(1)*g0%mats(L)*g0%mats(1)
     do j=1,L
