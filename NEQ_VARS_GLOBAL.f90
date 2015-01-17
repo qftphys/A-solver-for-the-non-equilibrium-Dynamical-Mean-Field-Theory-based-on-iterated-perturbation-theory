@@ -87,19 +87,6 @@ MODULE NEQ_VARS_GLOBAL
 
 
 
-  ! !NAMELISTS:
-  ! !=========================================================
-  ! namelist/variables/&
-  !      dt,Ntime,Ntau,beta,Ui,U,Usti,Ust,ts,Lfreq,eps,  &    ! INPUT
-  !      bath_type,Vbath,Wbath,Walpha,Wgap,  &    ! BATH
-  !      Nx,Lkreduced,                       &    ! LATTICE
-  !      Efield,Ex,Ey,field_type,t0,t1,      &    !
-  !      Ncycles,omega0,E1,                  &    ! ELECTRIC FIELD
-  !      nloop,dmft_error,nsuccess,weight,    &    ! DMFT
-  !      plot3D,fchi,ifourth,fupdate,     &    ! FLAGS
-  !      g0file,plot_dir           ! FILES & DIRS
-
-
 
 contains
 
@@ -114,6 +101,49 @@ contains
     integer                        :: i
     logical                        :: control
 
+    !INPUT
+    dt         = 0.1d0
+    Ntime      = 50
+    Ntau       = 25
+    beta       = 10.d0
+    Ui         = 2.d0
+    U          = 2.d0
+    ts         = 1.d0
+    Lfreq      = 2048  
+    eps        = 0.01d0
+    !BATH
+    bath_type  = 'flat'
+    Vbath      = 0.d0
+    Wbath      = 20.d0
+    Walpha     = 1.d0
+    Wgap       = 5.d0
+    !
+    !LATTICE
+    Nx           = 25
+    Lkreduced    = 300
+    !FIELD:
+    Efield       = 0.d0
+    field_type   = 'dc'
+    Ex           = 1.d0
+    Ey           = 0.d0
+    t0           = 0.d0
+    t1           = 1.d9
+    Ncycles      = 1
+    omega0       = 1.d0*pi
+    E1           = 0.d0
+    !DMFT
+    nloop        = 30
+    dmft_error    = 1.d-3
+    nsuccess     = 2
+    weight       = 1.d0
+    !FLAGS:
+    plot3D       = .false.
+    fchi         = .false.
+    ifourth      = .false.
+    fupdate      = 0
+    !FILES&DIR:
+    g0file   = 'g0.restart'
+    plot_dir     = 'PLOT'
 
     !GLOBAL
     call parse_input_variable(Ntime      , "NTIME" , inputFILE , default      =100 , comment="Number of Real-Time steps")
@@ -122,7 +152,7 @@ contains
     call parse_input_variable(dt         , "DT" , inputFILE , default         =0.1d0 , comment="Real-time step")
     call parse_input_variable(beta       , "BETA" , inputFILE , default       =10d0 , comment="Inverse temperature")
     call parse_input_variable(Ui         , "U0" , inputFILE , default         =0d0 , comment="equilibrium local interaction")
-    call parse_input_variable(U       , "ULOC" , inputFILE , default       =2d0 , comment="non-equilibrium local interaction")
+    call parse_input_variable(U       , "U" , inputFILE , default       =1d0 , comment="non-equilibrium local interaction")
     call parse_input_variable(Nx       , "Nx" , inputFILE , default       =20 , comment="")
     call parse_input_variable(eps        , "EPS" , inputFILE , default        =0.01d0 , comment="broadening")
     call parse_input_variable(nloop      , "NLOOP" , inputFILE , default      =30 , comment="Max number of DMFT loop")
@@ -148,51 +178,7 @@ contains
     call save_input_file(inputFILE)
     call sf_version(revision)
 
-    !   call sf_version(revision)
 
-    !   !INPUT
-    !   dt         = 0.1d0
-    !   Ntime      = 50
-    !   Ntau       = 25
-    !   beta       = 10.d0
-    !   Ui         = 2.d0
-    !   U          = 2.d0
-    !   ts         = 1.d0
-    !   Lfreq      = 2048  
-    !   eps        = 0.01d0
-    !   !BATH
-    !   bath_type  = 'flat'
-    !   Vbath      = 0.d0
-    !   Wbath      = 20.d0
-    !   Walpha     = 1.d0
-    !   Wgap       = 5.d0
-    !   !
-    !   !LATTICE
-    !   Nx           = 25
-    !   Lkreduced    = 300
-    !   !FIELD:
-    !   Efield       = 0.d0
-    !   field_type   = 'dc'
-    !   Ex           = 1.d0
-    !   Ey           = 0.d0
-    !   t0           = 0.d0
-    !   t1           = 1.d9
-    !   Ncycles      = 1
-    !   omega0       = 1.d0*pi
-    !   E1           = 0.d0
-    !   !DMFT
-    !   nloop        = 30
-    !   dmft_error    = 1.d-3
-    !   nsuccess     = 2
-    !   weight       = 1.d0
-    !   !FLAGS:
-    !   plot3D       = .false.
-    !   fchi         = .false.
-    !   ifourth      = .false.
-    !   fupdate      = 0
-    !   !FILES&DIR:
-    !   g0file   = 'g0.restart'
-    !   plot_dir     = 'PLOT'
 
     !   inquire(file=adjustl(trim(inputFILE)),exist=control)
     !   if(control)then

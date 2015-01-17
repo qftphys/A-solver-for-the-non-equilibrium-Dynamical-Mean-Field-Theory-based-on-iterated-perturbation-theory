@@ -129,63 +129,10 @@ program neqDMFT
   call plot_kb_contour_gf("Gloc",Gloc,cc_params)
   call plot_kb_contour_gf("G0",Gwf,cc_params)
 
-  call test_(Gloc,Sigma,cc_params)
-
   print*,"BRAVO"
 
 contains
 
-
-  !+-------------------------------------------------------------------+
-  !PURPOSE: setup initial conditions for k-resolved GF
-  !+-------------------------------------------------------------------+
-  subroutine setup_initial_conditions(Gk,dGk,Self,ik,params)
-    type(kb_contour_gf)                 :: Gk,Self
-    type(kb_contour_dgf)                :: dGk
-    integer                             :: ik
-    type(kb_contour_params)             :: params
-    integer                             :: i,j,k,L,Lf
-    complex(8),dimension(Lfreq)         :: Gkiw
-    real(8),dimension(Lfreq)            :: wm
-    real(8)                             :: nk
-    complex(8)                          :: epsk
-    complex(8),allocatable,dimension(:) :: SxG
-    L = params%Ntau
-    Lf= params%Lf
-    do i=1,Lf
-       Gk%iw(i) = one/(xi*params%wm(i) - epsi(ik) - Self%iw(i))
-    enddo
-    call fft_gf_iw2tau(Gk%iw,Gk%mats(0:),beta)        
-    Gk%less(1,1) = -xi*Gk%mats(L)
-    Gk%ret(1,1)  = -xi
-    forall(i=0:L)Gk%lmix(1,i)=-xi*Gk%mats(L-i)
-    !
-    !Derivatives
-    allocate(SxG(0:L))
-    !
-    !get d/dt G_k^R = -i e(k,0)G_k^R
-    dGk%ret(1)  = -xi*epsi(ik)*Gk%ret(1,1)
-    !
-    !get d/dt G_k^< = -i e(k,0)G_k^< -xi(-xi)int_0^beta S^\lmix*G_k^\rmix
-    do k=0,L
-       SxG(k)=self%lmix(1,k)*conjg(Gk%lmix(1,L-k))
-    end do
-    dGk%less(1) = -xi*epsi(ik)*Gk%less(1,1)-&
-         xi*(-xi)*params%dtau*kb_trapz(SxG(0:),0,L) 
-    !
-    !get d/dt G_k^\lmix = -xi*e(k,0)*G_k^\lmix - xi*int_0^beta G_k^\lmix*G_k^M
-    dGk%lmix(0:)= -xi*epsi(ik)*Gk%lmix(1,0:)
-    do j=0,L
-       do k=0,j
-          SxG(k)=self%lmix(1,k)*Gk%mats(k+L-j)
-       end do
-       dGk%lmix(j)=dGk%lmix(j)+xi*params%dtau*kb_trapz(SxG(0:),0,j)
-       do k=j,L
-          SxG(k)=self%lmix(1,k)*Gk%mats(k-j)
-       end do
-       dGk%lmix(j)=dGk%lmix(j)-xi*params%dtau*kb_trapz(SxG(0:),j,L) 
-    enddo
-  end subroutine setup_initial_conditions
 
 
 
@@ -308,6 +255,61 @@ contains
 
 
 
+
+
+  !+-------------------------------------------------------------------+
+  !PURPOSE: setup initial conditions for k-resolved GF
+  !+-------------------------------------------------------------------+
+  subroutine setup_initial_conditions(Gk,dGk,Self,ik,params)
+    type(kb_contour_gf)                 :: Gk,Self
+    type(kb_contour_dgf)                :: dGk
+    integer                             :: ik
+    type(kb_contour_params)             :: params
+    integer                             :: i,j,k,L,Lf
+    complex(8),dimension(Lfreq)         :: Gkiw
+    real(8),dimension(Lfreq)            :: wm
+    real(8)                             :: nk
+    complex(8)                          :: epsk
+    complex(8),allocatable,dimension(:) :: SxG
+    L = params%Ntau
+    Lf= params%Lf
+    do i=1,Lf
+       Gk%iw(i) = one/(xi*params%wm(i) - epsi(ik) - Self%iw(i))
+    enddo
+    call fft_gf_iw2tau(Gk%iw,Gk%mats(0:),beta)        
+    Gk%less(1,1) = -xi*Gk%mats(L)
+    Gk%ret(1,1)  = -xi
+    forall(i=0:L)Gk%lmix(1,i)=-xi*Gk%mats(L-i)
+    !
+    !Derivatives
+    allocate(SxG(0:L))
+    !
+    !get d/dt G_k^R = -i e(k,0)G_k^R
+    dGk%ret(1)  = -xi*epsi(ik)*Gk%ret(1,1)
+    !
+    !get d/dt G_k^< = -i e(k,0)G_k^< -xi(-xi)int_0^beta S^\lmix*G_k^\rmix
+    do k=0,L
+       SxG(k)=self%lmix(1,k)*conjg(Gk%lmix(1,L-k))
+    end do
+    dGk%less(1) = -xi*epsi(ik)*Gk%less(1,1)-&
+         xi*(-xi)*params%dtau*kb_trapz(SxG(0:),0,L) 
+    !
+    !get d/dt G_k^\lmix = -xi*e(k,0)*G_k^\lmix - xi*int_0^beta G_k^\lmix*G_k^M
+    dGk%lmix(0:)= -xi*epsi(ik)*Gk%lmix(1,0:)
+    do j=0,L
+       do k=0,j
+          SxG(k)=self%lmix(1,k)*Gk%mats(k+L-j)
+       end do
+       dGk%lmix(j)=dGk%lmix(j)+xi*params%dtau*kb_trapz(SxG(0:),0,j)
+       do k=j,L
+          SxG(k)=self%lmix(1,k)*Gk%mats(k-j)
+       end do
+       dGk%lmix(j)=dGk%lmix(j)-xi*params%dtau*kb_trapz(SxG(0:),j,L) 
+    enddo
+  end subroutine setup_initial_conditions
+
+
+
   !+-------------------------------------------------------------------+
   !PURPOSE: setup the Weiss Field G0 for the next time-step
   !+-------------------------------------------------------------------+
@@ -409,212 +411,11 @@ contains
 
 
 
-
-    !#################################
-
-
-    if(ifourth)then
-       print*,"Entering 4th order..."
-
-       Ntot = 2*N+L+1
-
-       do i=1,4
-          call allocate_kb_contour_gf(sigma4(i),params)
-          sigma4(i) = zero
-       enddo
-
-       allocate(G0mat(Ntot,Ntot),G2mat(Ntot,Ntot),G3mat(Ntot,Ntot))
-       allocate(Chimat(Ntot,Ntot),Smat(Ntot,Ntot),Sfoo(Ntot,Ntot))
-       allocate(tdiff(Ntot),Utime(Ntot))
-
-       tdiff(1:N)           =  params%dt
-       tdiff(N+1:2*N)       = -params%dt
-       tdiff(2*N+1:2*N+L+1) = -xi*params%dtau
-
-       Utime(1:N)           = U 
-       Utime(N+1:2*N)       = U
-       Utime(2*N+1:2*N+L+1) = Ui
-
-
-       !Sigma^(4a):
-       !================================================================
-       print*,"get 4a..."
-       call kb_contour_gf2kb_matrix(G0,N,L,G0mat)
-       do i=1,Ntot
-          do j=1,Ntot
-             G2mat(i,j) = G0mat(i,j)*G0mat(i,j)
-             G3mat(i,j) = G0mat(i,j)*G0mat(i,j)*G0mat(i,j)
-          enddo
-       enddo
-       print*,"convolute [G0^2*G0^2]:"
-       call convolute_kb_matrix_gf(G2mat,G2mat,N,L,params,Chimat)
-       print*,"convolute [G0^2*Chi]:"
-       call convolute_kb_matrix_gf(G2mat,Chimat,N,L,params,Sfoo)
-       do i=1,Ntot
-          do j=1,Ntot
-             Smat(i,j) = G0mat(i,j)*Sfoo(i,j)
-          enddo
-       enddo
-       print*,"extract Sigma^a:"
-       call kb_matrix2kb_contour_gf(Smat,N,L,Sigma4(1))
-
-
-
-
-
-       !Sigma^(4b):
-       print*,"Get 4b..."
-       print*,"convolute [G0^3*G0]:"
-       call convolute_kb_matrix_gf(G3mat,G0mat,N,L,params,Chimat)
-       print*,"convolute [G0*Chi]:"
-       call convolute_kb_matrix_gf(G0mat,Chimat,N,L,params,Sfoo)
-       do i=1,Ntot
-          do j=1,Ntot
-             Smat(i,j) = G2mat(i,j)*Sfoo(i,j)
-          enddo
-       enddo
-       print*,"extract Sigma^b:"
-       call kb_matrix2kb_contour_gf(Smat,N,L,Sigma4(2))
-
-
-
-       !Sigma^(4c):
-       print*,"Get 4c"
-       Smat  = zero
-       do i=1,Ntot
-          do j=1,Ntot
-             int_ij=zero
-             do ia=1,Ntot
-                intb=zero
-                do ib=1,Ntot
-                   intb = intb + G0mat(i,ia)*G0mat(ia,ib)*G0mat(ib,j)*G2mat(i,ib)*G2mat(ia,j)*tdiff(ib)
-                enddo
-                int_ij = int_ij + intb*tdiff(ia)
-             enddo
-
-             Smat(i,j) = int_ij
-          enddo
-       enddo
-       print*,"extract Sigma^c:"
-       call kb_matrix2kb_contour_gf(Smat,N,L,Sigma4(3))
-
-
-
-
-
-       !Sigma^(4d):
-       print*,"Get 4d"
-       Smat  = zero
-       do i=1,Ntot
-          do j=1,Ntot
-             int_ij=zero
-             do ia=1,Ntot
-                intb=zero
-                do ib=1,Ntot
-                   intb = intb + G0mat(i,ia)*G0mat(ia,j)*G0mat(i,ib)*G0mat(ib,j)*G2mat(ia,ib)*tdiff(ib)
-                enddo
-                int_ij = int_ij + intb*tdiff(ia)
-             enddo
-             Smat(i,j) = G0mat(i,j)*int_ij
-          enddo
-       enddo
-       print*,"extract Sigma^d:"
-       call kb_matrix2kb_contour_gf(Smat,N,L,Sigma4(4))
-
-
-       !call plot_kb_contour_gf("Sigma4a_test",Sigma4(1),params)
-       !call plot_kb_contour_gf("Sigma4b_test",Sigma4(2),params)
-       !call plot_kb_contour_gf("Sigma4c",Sigma4(3),params)
-       !call plot_kb_contour_gf("Sigma4d",Sigma4(4),params)
-
-       !============================================
-
-
-
-
-
-       print*,"Sum up Sigma2+Sigma4:"
-       do j=1,N
-          Sigma%less(N,j) = Sigma%less(N,j) + &
-               3.d0*U*U*U*U*(Sigma4(1)%less(N,j) + Sigma4(2)%less(N,j) + Sigma4(3)%less(N,j) - Sigma4(4)%less(N,j))
-          Sigma%ret(N,j) = Sigma%ret(N,j) + &
-               3.d0*U*U*U*U*(Sigma4(1)%ret(N,j) + Sigma4(2)%ret(N,j) + Sigma4(3)%ret(N,j) - Sigma4(4)%ret(N,j))
-       enddo
-       do i=1,N-1
-          Sigma%less(i,N) = Sigma%less(i,N) + &
-               3.d0*U*U*U*U*(Sigma4(1)%less(i,N) + Sigma4(2)%less(i,N) + Sigma4(3)%less(i,N) - Sigma4(4)%less(i,N))          
-       enddo
-       !!ACTHUNG!! U_i might not be correct in this expression!!
-       do j=0,L
-          Sigma%lmix(N,j) = Sigma%lmix(N,j) + &
-               3.d0*U*U*U*Ui*(Sigma4(1)%lmix(N,j) + Sigma4(2)%lmix(N,j) + Sigma4(3)%lmix(N,j) - Sigma4(4)%lmix(N,j))
-       enddo
-
-
-       print*,"Deallocating:"
-       do i=1,4
-          call deallocate_kb_contour_gf(sigma4(i))
-       enddo
-       deallocate(G0mat,G2mat,G3mat)
-       deallocate(Chimat,Smat,Sfoo)
-       deallocate(tdiff)
-    endif
-
   end subroutine neq_solve_ipt
 
 
 
 
-  subroutine test_(G,Self,params)
-    type(kb_contour_gf)                   :: G,Self,GxS
-    type(kb_contour_params)               :: params
-    integer                               :: N,L,i,j,Ntot
-    complex(8),dimension(:,:),allocatable :: Gmat,Smat,GxSmat
-    real(8),dimension(:),allocatable      :: time
-    N=params%Ntime
-    L=params%Ntau
-    Ntot=2*N+L+1
-    allocate(time(Ntot))
-    allocate(Gmat(Ntot,Ntot),Smat(Ntot,Ntot),GxSmat(Ntot,Ntot))
-    time(1:N)=params%t(1:N)
-    time(N+1:2*N)=time(N) + params%t(1:N)
-    time(2*N+1:2*N+L+1)=time(2*N)+params%tau(0:L)/beta
-    call kb_contour_gf2kb_matrix(G,N,L,Gmat)
-    call splot3d("Gmat_test.plot",time,time,Gmat)
-    call splot3d("Gmat_13.plot",params%t(1:N),params%tau(0:L),Gmat(1:N,2*N+1:2*N+1+L))
-    call splot3d("Gmat_12.plot",params%t(1:N),params%t(1:N),Gmat(1:N,N+1:2*N))
-    G=zero
-    call kb_matrix2kb_contour_gf(Gmat,N,L,G)
-    call plot_kb_contour_gf("G_test",G,params)
-
-
-    !
-    !get convolution in ordinary way:
-    call allocate_kb_contour_gf(GxS,params)
-    do i=1,params%Ntime
-       params%Nt=i
-       call convolute_kb_contour_gf(G,Self,GxS,params)
-    enddo
-    call plot_kb_contour_gf("GxS",GxS,params)
-    !
-
-
-    !map convolution to a matrix:
-    call kb_contour_gf2kb_matrix(GxS,N,L,Smat)
-    call splot3d("GxSmat_test1.plot",time,time,Smat)
-    !
-    !Evaluate convolution using Keldysh Matrices
-    call kb_contour_gf2kb_matrix(Self,N,L,Smat)
-    call convolute_kb_matrix_gf(Gmat,Smat,N,L,params,GxSmat)
-    call splot3d("GxSmat_test2.plot",time,time,GxSmat)
-    call splot3d("GxS_13.plot",params%t(1:N),params%tau(0:L),GxSmat(1:N,2*N+1:2*N+1+L))
-    call splot3d("GxS_31.plot",params%tau(0:L),params%t(1:N),GxSmat(2*N+1:2*N+1+L,1:N))
-
-
-    GxS=zero
-    call kb_matrix2kb_contour_gf(GxSmat,N,L,GxS)
-    call plot_kb_contour_gf("GxS_test",GxS,params)
-  end subroutine test_
 
 
 
@@ -818,155 +619,158 @@ contains
 end PROGRAM neqDMFT
 
 
-       ! !!Sigma^(4c):
-       ! print*,"Get 4c"
-       ! Smat=zero
-       ! do i=1,Ntot
-       !    do j=1,Ntot
-       !       int_ij=zero
-
-       !       inta=zero
-       !       do ia=1,N
-       !          intb(0:)=zero
-       !          do ib=1,N
-       !             intb(ib) = G0mat(i,ia)*G0mat(ia,ib)*G0mat(ib,j)*G2mat(i,ib)*G2mat(ia,j)
-       !          enddo
-       !          inta(ia) = inta(ia) + params%dt*kb_trapz(intb(0:),1,N)
-       !          intb(0:)=zero
-       !          do ib=1,N
-       !             intb(ib) = G0mat(i,ia)*G0mat(ia,ib+N)*G0mat(ib+N,j)*G2mat(i,ib+N)*G2mat(ia,j)
-       !          enddo
-       !          inta(ia) = inta(ia) - params%dt*kb_trapz(intb(0:),1,N)
-       !          intb(0:)=zero
-       !          do ib=0,L
-       !             intb(ib) = G0mat(i,ia)*G0mat(ia,2*N+1+ib)*G0mat(2*N+1+ib,j)*G2mat(i,2*N+1+ib)*G2mat(ia,j)
-       !          enddo
-       !          inta(ia) = inta(ia) -xi*params%dtau*kb_trapz(intb(0:),0,L)
-       !       enddo
-       !       int_ij = int_ij + params%dt*kb_trapz(inta(0:),1,N)
-
-       !       inta=zero
-       !       do ia=1,N
-       !          intb(0:)=zero
-       !          do ib=1,N
-       !             intb(ib) = G0mat(i,ia+N)*G0mat(ia+N,ib)*G0mat(ib,j)*G2mat(i,ib)*G2mat(ia+N,j)
-       !          enddo
-       !          inta(ia) = inta(ia) + params%dt*kb_trapz(intb(0:),1,N)
-       !          intb(0:)=zero
-       !          do ib=1,N
-       !             intb(ib) = G0mat(i,ia+N)*G0mat(ia+N,ib+N)*G0mat(ib+N,j)*G2mat(i,ib+N)*G2mat(ia+N,j)
-       !          enddo
-       !          inta(ia) = inta(ia) - params%dt*kb_trapz(intb(0:),1,N)
-       !          intb(0:)=zero
-       !          do ib=0,L
-       !             intb(ib) = G0mat(i,ia+N)*G0mat(ia+N,2*N+1+ib)*G0mat(2*N+1+ib,j)*G2mat(i,2*N+1+ib)*G2mat(ia+N,j)
-       !          enddo
-       !          inta(ia) = inta(ia) -xi*params%dtau*kb_trapz(intb(0:),0,L)
-       !       enddo
-       !       int_ij = int_ij - params%dt*kb_trapz(inta(0:),1,N)
-
-       !       inta=zero
-       !       do ia=0,L
-       !          intb(0:)=zero
-       !          do ib=1,N
-       !             intb(ib) = G0mat(i,2*N+1+ia)*G0mat(2*N+1+ia,ib)*G0mat(ib,j)*G2mat(i,ib)*G2mat(2*N+1+ia,j)
-       !          enddo
-       !          inta(ia) = inta(ia) + params%dt*kb_trapz(intb(0:),1,N)
-       !          intb(0:)=zero
-       !          do ib=1,N
-       !             intb(ib) = G0mat(i,2*N+1+ia)*G0mat(2*N+1+ia,ib+N)*G0mat(ib+N,j)*G2mat(i,ib+N)*G2mat(2*N+1+ia,j)
-       !          enddo
-       !          inta(ia) = inta(ia) - params%dt*kb_trapz(intb(0:),1,N)
-       !          intb(0:)=zero
-       !          do ib=0,L
-       !             intb(ib) = G0mat(i,2*N+1+ia)*G0mat(2*N+1+ia,2*N+1+ib)*G0mat(2*N+1+ib,j)*G2mat(i,2*N+1+ib)*G2mat(2*N+1+ia,j)
-       !          enddo
-       !          inta(ia) = inta(ia) -xi*params%dtau*kb_trapz(intb(0:),0,L)
-       !       enddo
-       !       int_ij = int_ij -xi*params%dtau*kb_trapz(inta(0:),0,L)
-
-       !       !
-       !       Smat(i,j) = int_ij
-       !    enddo
-       ! enddo
-       ! print*,"extract Sigma^c:"
-       ! call kb_matrix2kb_contour_gf(Smat,N,L,Sigma4(3))
 
 
 
-       ! !!Sigma^(4d):
-       ! print*,"Get 4d"
-       ! Smat=zero
-       ! do i=1,Ntot
-       !    do j=1,Ntot
-       !       int_ij=zero
+! !!Sigma^(4c):
+! print*,"Get 4c"
+! Smat=zero
+! do i=1,Ntot
+!    do j=1,Ntot
+!       int_ij=zero
 
-       !       inta=zero
-       !       do ia=1,N
-       !          intb(0:)=zero
-       !          do ib=1,N
-       !             intb(ib) = G0mat(i,ia)*G0mat(ia,j)*G0mat(i,ib)*G0mat(ib,j)*G2mat(ia,ib)
-       !          enddo
-       !          inta(ia) = inta(ia) + params%dt*kb_trapz(intb(0:),1,N)
-       !          intb(0:)=zero
-       !          do ib=1,N
-       !             intb(ib) = G0mat(i,ia)*G0mat(ia,j)*G0mat(i,N+ib)*G0mat(N+ib,j)*G2mat(ia,N+ib)
-       !          enddo
-       !          inta(ia) = inta(ia) - params%dt*kb_trapz(intb(0:),1,N)
-       !          intb(0:)=zero
-       !          do ib=0,L
-       !             intb(ib) = G0mat(i,ia)*G0mat(ia,j)*G0mat(i,2*N+i+ib)*G0mat(2*N+i+ib,j)*G2mat(ia,2*N+i+ib)
-       !          enddo
-       !          inta(ia) = inta(ia) -xi*params%dtau*kb_trapz(intb(0:),0,L)
-       !       enddo
-       !       int_ij = int_ij + params%dt*kb_trapz(inta(0:),1,N)
+!       inta=zero
+!       do ia=1,N
+!          intb(0:)=zero
+!          do ib=1,N
+!             intb(ib) = G0mat(i,ia)*G0mat(ia,ib)*G0mat(ib,j)*G2mat(i,ib)*G2mat(ia,j)
+!          enddo
+!          inta(ia) = inta(ia) + params%dt*kb_trapz(intb(0:),1,N)
+!          intb(0:)=zero
+!          do ib=1,N
+!             intb(ib) = G0mat(i,ia)*G0mat(ia,ib+N)*G0mat(ib+N,j)*G2mat(i,ib+N)*G2mat(ia,j)
+!          enddo
+!          inta(ia) = inta(ia) - params%dt*kb_trapz(intb(0:),1,N)
+!          intb(0:)=zero
+!          do ib=0,L
+!             intb(ib) = G0mat(i,ia)*G0mat(ia,2*N+1+ib)*G0mat(2*N+1+ib,j)*G2mat(i,2*N+1+ib)*G2mat(ia,j)
+!          enddo
+!          inta(ia) = inta(ia) -xi*params%dtau*kb_trapz(intb(0:),0,L)
+!       enddo
+!       int_ij = int_ij + params%dt*kb_trapz(inta(0:),1,N)
 
-       !       inta=zero
-       !       do ia=1,N
-       !          intb(0:)=zero
-       !          do ib=1,N
-       !             intb(ib) = G0mat(i,ia+N)*G0mat(ia+N,j)*G0mat(i,ib)*G0mat(ib,j)*G2mat(ia+N,ib)
-       !          enddo
-       !          inta(ia) = inta(ia) + params%dt*kb_trapz(intb(0:),1,N)
-       !          intb(0:)=zero
-       !          do ib=1,N
-       !             intb(ib) = G0mat(i,ia+N)*G0mat(ia+N,j)*G0mat(i,N+ib)*G0mat(N+ib,j)*G2mat(ia+N,N+ib)
-       !          enddo
-       !          inta(ia) = inta(ia) - params%dt*kb_trapz(intb(0:),1,N)
-       !          intb(0:)=zero
-       !          do ib=0,L
-       !             intb(ib) = G0mat(i,ia+N)*G0mat(ia+N,j)*G0mat(i,2*N+i+ib)*G0mat(2*N+i+ib,j)*G2mat(ia+N,2*N+i+ib)
-       !          enddo
-       !          inta(ia) = inta(ia) -xi*params%dtau*kb_trapz(intb(0:),0,L)
-       !       enddo
-       !       int_ij = int_ij - params%dt*kb_trapz(inta(0:),1,N)
+!       inta=zero
+!       do ia=1,N
+!          intb(0:)=zero
+!          do ib=1,N
+!             intb(ib) = G0mat(i,ia+N)*G0mat(ia+N,ib)*G0mat(ib,j)*G2mat(i,ib)*G2mat(ia+N,j)
+!          enddo
+!          inta(ia) = inta(ia) + params%dt*kb_trapz(intb(0:),1,N)
+!          intb(0:)=zero
+!          do ib=1,N
+!             intb(ib) = G0mat(i,ia+N)*G0mat(ia+N,ib+N)*G0mat(ib+N,j)*G2mat(i,ib+N)*G2mat(ia+N,j)
+!          enddo
+!          inta(ia) = inta(ia) - params%dt*kb_trapz(intb(0:),1,N)
+!          intb(0:)=zero
+!          do ib=0,L
+!             intb(ib) = G0mat(i,ia+N)*G0mat(ia+N,2*N+1+ib)*G0mat(2*N+1+ib,j)*G2mat(i,2*N+1+ib)*G2mat(ia+N,j)
+!          enddo
+!          inta(ia) = inta(ia) -xi*params%dtau*kb_trapz(intb(0:),0,L)
+!       enddo
+!       int_ij = int_ij - params%dt*kb_trapz(inta(0:),1,N)
+
+!       inta=zero
+!       do ia=0,L
+!          intb(0:)=zero
+!          do ib=1,N
+!             intb(ib) = G0mat(i,2*N+1+ia)*G0mat(2*N+1+ia,ib)*G0mat(ib,j)*G2mat(i,ib)*G2mat(2*N+1+ia,j)
+!          enddo
+!          inta(ia) = inta(ia) + params%dt*kb_trapz(intb(0:),1,N)
+!          intb(0:)=zero
+!          do ib=1,N
+!             intb(ib) = G0mat(i,2*N+1+ia)*G0mat(2*N+1+ia,ib+N)*G0mat(ib+N,j)*G2mat(i,ib+N)*G2mat(2*N+1+ia,j)
+!          enddo
+!          inta(ia) = inta(ia) - params%dt*kb_trapz(intb(0:),1,N)
+!          intb(0:)=zero
+!          do ib=0,L
+!             intb(ib) = G0mat(i,2*N+1+ia)*G0mat(2*N+1+ia,2*N+1+ib)*G0mat(2*N+1+ib,j)*G2mat(i,2*N+1+ib)*G2mat(2*N+1+ia,j)
+!          enddo
+!          inta(ia) = inta(ia) -xi*params%dtau*kb_trapz(intb(0:),0,L)
+!       enddo
+!       int_ij = int_ij -xi*params%dtau*kb_trapz(inta(0:),0,L)
+
+!       !
+!       Smat(i,j) = int_ij
+!    enddo
+! enddo
+! print*,"extract Sigma^c:"
+! call kb_matrix2kb_contour_gf(Smat,N,L,Sigma4(3))
 
 
-       !       inta=zero
-       !       do ia=0,L
-       !          intb(0:)=zero
-       !          do ib=1,N
-       !             intb(ib) = G0mat(i,2*N+1+ia)*G0mat(2*N+1+ia,j)*G0mat(i,ib)*G0mat(ib,j)*G2mat(2*N+1+ia,ib)
-       !          enddo
-       !          inta(ia) = inta(ia) + params%dt*kb_trapz(intb(0:),1,N)
-       !          intb(0:)=zero
-       !          do ib=1,N
-       !             intb(ib) = G0mat(i,2*N+1+ia)*G0mat(2*N+1+ia,j)*G0mat(i,N+ib)*G0mat(N+ib,j)*G2mat(2*N+1+ia,N+ib)
-       !          enddo
-       !          inta(ia) = inta(ia) - params%dt*kb_trapz(intb(0:),1,N)
-       !          intb(0:)=zero
-       !          do ib=0,L
-       !             intb(ib) = G0mat(i,2*N+1+ia)*G0mat(2*N+1+ia,j)*G0mat(i,2*N+i+ib)*G0mat(2*N+i+ib,j)*G2mat(2*N+1+ia,2*N+i+ib)
-       !          enddo
-       !          inta(ia) = inta(ia) -xi*params%dtau*kb_trapz(intb(0:),0,L)
-       !       enddo
-       !       int_ij = int_ij - xi*params%dtau*kb_trapz(inta(0:),0,L)
+
+! !!Sigma^(4d):
+! print*,"Get 4d"
+! Smat=zero
+! do i=1,Ntot
+!    do j=1,Ntot
+!       int_ij=zero
+
+!       inta=zero
+!       do ia=1,N
+!          intb(0:)=zero
+!          do ib=1,N
+!             intb(ib) = G0mat(i,ia)*G0mat(ia,j)*G0mat(i,ib)*G0mat(ib,j)*G2mat(ia,ib)
+!          enddo
+!          inta(ia) = inta(ia) + params%dt*kb_trapz(intb(0:),1,N)
+!          intb(0:)=zero
+!          do ib=1,N
+!             intb(ib) = G0mat(i,ia)*G0mat(ia,j)*G0mat(i,N+ib)*G0mat(N+ib,j)*G2mat(ia,N+ib)
+!          enddo
+!          inta(ia) = inta(ia) - params%dt*kb_trapz(intb(0:),1,N)
+!          intb(0:)=zero
+!          do ib=0,L
+!             intb(ib) = G0mat(i,ia)*G0mat(ia,j)*G0mat(i,2*N+i+ib)*G0mat(2*N+i+ib,j)*G2mat(ia,2*N+i+ib)
+!          enddo
+!          inta(ia) = inta(ia) -xi*params%dtau*kb_trapz(intb(0:),0,L)
+!       enddo
+!       int_ij = int_ij + params%dt*kb_trapz(inta(0:),1,N)
+
+!       inta=zero
+!       do ia=1,N
+!          intb(0:)=zero
+!          do ib=1,N
+!             intb(ib) = G0mat(i,ia+N)*G0mat(ia+N,j)*G0mat(i,ib)*G0mat(ib,j)*G2mat(ia+N,ib)
+!          enddo
+!          inta(ia) = inta(ia) + params%dt*kb_trapz(intb(0:),1,N)
+!          intb(0:)=zero
+!          do ib=1,N
+!             intb(ib) = G0mat(i,ia+N)*G0mat(ia+N,j)*G0mat(i,N+ib)*G0mat(N+ib,j)*G2mat(ia+N,N+ib)
+!          enddo
+!          inta(ia) = inta(ia) - params%dt*kb_trapz(intb(0:),1,N)
+!          intb(0:)=zero
+!          do ib=0,L
+!             intb(ib) = G0mat(i,ia+N)*G0mat(ia+N,j)*G0mat(i,2*N+i+ib)*G0mat(2*N+i+ib,j)*G2mat(ia+N,2*N+i+ib)
+!          enddo
+!          inta(ia) = inta(ia) -xi*params%dtau*kb_trapz(intb(0:),0,L)
+!       enddo
+!       int_ij = int_ij - params%dt*kb_trapz(inta(0:),1,N)
 
 
-       !       !
-       !       Smat(i,j) = G0mat(i,j)*int_ij
-       !    enddo
-       ! enddo
-       ! print*,"extract Sigma^c:"
-       ! call kb_matrix2kb_contour_gf(Smat,N,L,Sigma4(4))
+!       inta=zero
+!       do ia=0,L
+!          intb(0:)=zero
+!          do ib=1,N
+!             intb(ib) = G0mat(i,2*N+1+ia)*G0mat(2*N+1+ia,j)*G0mat(i,ib)*G0mat(ib,j)*G2mat(2*N+1+ia,ib)
+!          enddo
+!          inta(ia) = inta(ia) + params%dt*kb_trapz(intb(0:),1,N)
+!          intb(0:)=zero
+!          do ib=1,N
+!             intb(ib) = G0mat(i,2*N+1+ia)*G0mat(2*N+1+ia,j)*G0mat(i,N+ib)*G0mat(N+ib,j)*G2mat(2*N+1+ia,N+ib)
+!          enddo
+!          inta(ia) = inta(ia) - params%dt*kb_trapz(intb(0:),1,N)
+!          intb(0:)=zero
+!          do ib=0,L
+!             intb(ib) = G0mat(i,2*N+1+ia)*G0mat(2*N+1+ia,j)*G0mat(i,2*N+i+ib)*G0mat(2*N+i+ib,j)*G2mat(2*N+1+ia,2*N+i+ib)
+!          enddo
+!          inta(ia) = inta(ia) -xi*params%dtau*kb_trapz(intb(0:),0,L)
+!       enddo
+!       int_ij = int_ij - xi*params%dtau*kb_trapz(inta(0:),0,L)
+
+
+!       !
+!       Smat(i,j) = G0mat(i,j)*int_ij
+!    enddo
+! enddo
+! print*,"extract Sigma^c:"
+! call kb_matrix2kb_contour_gf(Smat,N,L,Sigma4(4))
 
