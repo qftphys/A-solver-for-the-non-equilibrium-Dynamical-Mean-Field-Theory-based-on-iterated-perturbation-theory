@@ -419,7 +419,7 @@ contains
     integer          :: i
     logical          :: check,bool(5)
     character(len=*) :: file
-    character(len=16),dimension(5)  :: ctype=(['less','ret','lmix','mats','iw'])
+    character(len=16),dimension(5)  :: ctype=([ character(len=5) :: 'less','ret','lmix','mats','iw'])
     check=.true.
     do i=1,5
        inquire(file=reg(file)//"_"//reg(ctype(i))//".data",exist=bool(i))
@@ -432,7 +432,7 @@ contains
     integer          :: i
     logical          :: check,bool(3)
     character(len=*) :: file
-    character(len=16),dimension(3)  :: ctype=(['less','ret','lmix'])
+    character(len=16),dimension(3)  :: ctype=([character(len=5) :: 'less','ret','lmix'])
     check=.true.
     do i=1,3
        inquire(file=reg(file)//"_"//reg(ctype(i))//".data",exist=bool(i))

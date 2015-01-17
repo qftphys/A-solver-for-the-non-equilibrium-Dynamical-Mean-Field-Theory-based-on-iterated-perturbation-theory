@@ -53,7 +53,7 @@ contains
        wfreq = linspace(-wmax,wmax,L,mesh=dw)
        call get_bath_gapflat_dos()
     case default
-       call abort("Bath type:"//reg(bath_type)//" not supported.")
+       stop "Bath type: not supported."
     end select
     call splot("DOSbath.plot",wfreq,bath_dens,append=.true.)
 

@@ -26,14 +26,14 @@ contains
        Ey=Ey/modulo
     endif
     Ek%x=Ex;Ek%y=Ey
-    call msg("|E|=E0="//trim(txtfy(Efield/modulo)),id=0)
+    print*,"|E|=E0="//trim(txtfy(Efield/modulo))
     check=.false.
     check=field_type=="dc".OR.&
          field_type=="ac".OR.&
          field_type=="acdc".OR.&
          field_type=="pulse".OR.&
          field_type=="ramp"
-    if(.not.check)call error("ELECTRIC_FIELD/Afield: wrong field_type. set:dc,ac,acdc,pulse,ramp")
+    if(.not.check)stop "ELECTRIC_FIELD/Afield: wrong field_type. set:dc,ac,acdc,pulse,ramp"
   end subroutine set_efield_vector
 
 
@@ -108,7 +108,7 @@ contains
     enddo
     close(10)
     close(11)
-    if(field_type=="ac")call msg("Root condition: "//trim(txtfy(bessel_j0(Efield/Omega0))))
+    if(field_type=="ac")print*,"Root condition: "//trim(txtfy(bessel_j0(Efield/Omega0)))
   end subroutine print_field
 
 

@@ -7,8 +7,7 @@
 !AUTHORS  : Adriano Amaricci 
 !###################################################################
 program neqDMFT
-  USE ERROR
-  USE FFTGF
+  USE DMFT_TOOLS
   USE NEQ_VARS_GLOBAL   !global variables, calls to 3rd library 
   USE NEQ_THERMOSTAT    !contains bath inizialization
   implicit none
@@ -101,9 +100,7 @@ program neqDMFT
         converged = convergence_check(Gwf,cc_params)
         !
      enddo
-     call plot_kb_contour_gf("Sigma",Sigma,cc_params)
-     call plot_kb_contour_gf("Gloc",Gloc,cc_params)
-     call plot_kb_contour_gf("G0",Gwf,cc_params)
+
 
      !EVALUATE AND PRINT THE RESULTS OF THE CALCULATION
      call measure_observables(Gloc,Sigma,cc_params)
@@ -128,7 +125,9 @@ program neqDMFT
      forall(itime=1:cc_params%Ntime)nk(itime,ik)=dimag(Gwf%less(itime,itime))
   enddo
   call splot3d("nkVSepsikVStime.plot",cc_params%t,epsi,nk,wlines=.true.)
-
+  call plot_kb_contour_gf("Sigma",Sigma,cc_params)
+  call plot_kb_contour_gf("Gloc",Gloc,cc_params)
+  call plot_kb_contour_gf("G0",Gwf,cc_params)
 
   call test_(Gloc,Sigma,cc_params)
 
@@ -156,7 +155,7 @@ contains
     do i=1,Lf
        Gk%iw(i) = one/(xi*params%wm(i) - epsi(ik) - Self%iw(i))
     enddo
-    call fftgf_iw2tau(Gk%iw,Gk%mats(0:),beta)        
+    call fft_gf_iw2tau(Gk%iw,Gk%mats(0:),beta)        
     Gk%less(1,1) = -xi*Gk%mats(L)
     Gk%ret(1,1)  = -xi
     forall(i=0:L)Gk%lmix(1,i)=-xi*Gk%mats(L-i)
@@ -206,6 +205,7 @@ contains
     complex(8)                          :: zeta
     complex(8)                          :: Self_gtr
     complex(8),allocatable,dimension(:) :: GxG0
+    real(8) :: Scoeff(2),Gcoeff(4)
     if(.not.g0%status)stop "init_functions: g0 is not allocated"
     if(.not.dg0%status)stop "init_functions: dg0 is not allocated"
     if(.not.g%status)stop "init_functions: g is not allocated"
@@ -241,7 +241,8 @@ contains
     endif
     !
     !INITIALIZE THE WEISS FIELD G0^{x=M,<,R,\lmix}
-    call fftgf_iw2tau(g0%iw,g0%mats(0:),params%beta)
+    Gcoeff = tail_coeff_glat(U,0.5d0,0d0,0d0)
+    call fft_gf_iw2tau(g0%iw,g0%mats(0:),params%beta,Gcoeff)
     g0%less(1,1) = -xi*g0%mats(L)
     g0%ret(1,1)  = -xi
     forall(i=0:L)g0%lmix(1,i)=-xi*g0%mats(L-i)
@@ -256,7 +257,8 @@ contains
     do j=0,L
        Self%mats(j) = Ui*Ui*g0%mats(j)*g0%mats(L-j)*g0%mats(j)
     end do
-    call fftgf_tau2iw(Self%mats(0:),Self%iw,beta)
+    Scoeff  = tail_coeff_sigma(Ui,0.5d0)
+    call fft_sigma_tau2iw(Self%iw,Self%mats(0:),beta,Scoeff)
     Self%iw = xi*dimag(self%iw) !!ACTHUNG: imposing half-filling symmetry
     Self%less(1,1)=(xi**3)*U*U*g0%mats(L)*g0%mats(0)*g0%mats(L)
     Self_gtr      =(xi**3)*U*U*g0%mats(0)*g0%mats(L)*g0%mats(0)
@@ -271,7 +273,8 @@ contains
        zeta  = xi*wm - Self%iw(i)
        G%iw(i) = gfbethe(wm,zeta,2.d0*ts)
     enddo
-    call fftgf_iw2tau(G%iw,G%mats(0:),beta)         !get G(tau)
+    Gcoeff      = tail_coeff_glat(U,0.5d0,0d0,0d0)
+    call fft_gf_iw2tau(G%iw,G%mats,beta,Gcoeff)     !get G(tau)
     G%ret(1,1)  = -xi                               !get G^R(0,0)=-xi
     G%less(1,1) = -xi*G%mats(L)                  !get G^<(0,0)= xi*G^M(0-)
     forall(i=0:L)G%lmix(1,i)=-xi*G%mats(L-i) !get G^\lmix(0,tau)=-xi*G(beta-tau>0)
@@ -594,6 +597,8 @@ contains
     enddo
     call plot_kb_contour_gf("GxS",GxS,params)
     !
+
+
     !map convolution to a matrix:
     call kb_contour_gf2kb_matrix(GxS,N,L,Smat)
     call splot3d("GxSmat_test1.plot",time,time,Smat)

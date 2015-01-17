@@ -2,12 +2,12 @@ FC=gfortran
 #PRECOMPILATION FLAG (leave blank for serial code)
 FPP=
 
-#EXE=neqdmft_bethe
+EXE=neqdmft_bethe
 #EXE=neqdmft_bethe_2bands
 #EXE=neqdmft_lattice_2bands
 #EXE=neqdmft_bethe_dos
 #EXE=neqdmft_hypercubic
-EXE=neqdmft_2dsquare_quench
+#EXE=neqdmft_2dsquare_quench
 #EXE=neqdmft_2dsquare_field
 
 
