@@ -1,27 +1,29 @@
-MODULE CONTOUR_GF
+MODULE NEQ_CONTOUR_GF
+  USE NEQ_CONTOUR
+  USE CONSTANTS, only: one,xi,zero,pi
   USE IOTOOLS
   USE FUNCTIONS
   implicit none
   private
 
-  complex(8),parameter :: one=(1.d0,0.d0),xi=(0.d0,1.d0),zero=(0.d0,0.d0)
+  ! complex(8),parameter :: one=(1.d0,0.d0),xi=(0.d0,1.d0),zero=(0.d0,0.d0)
 
-  ! NON-EQ CONTOUR PARAMETERS
-  !====================================================
-  type,public                          :: kb_contour_params
-     integer                           :: Ntime=0,Ntau=0 !Largest dimension of the contour
-     integer                           :: Lf=0           !Number of Matsubara Frequencies
-     integer                           :: Nt=0           !Actual time index
-     real(8)                           :: dt=0.d0        !real-time step
-     real(8)                           :: dtau=0.d0      !im-time step
-     real(8)                           :: time=0.d0      !actual time at it=Nt
-     real(8),dimension(:),allocatable  :: t              !real-time array
-     real(8),dimension(:),allocatable  :: tau            !im-time array
-     real(8),dimension(:),allocatable  :: wm             !matsubara freq. array
-     real(8)                           :: beta=0.d0      !length of the im-time interval
-     real(8)                           :: tmax=0.d0      !length of the real-time interval
-     logical                           :: status=.false. !allocation status
-  end type kb_contour_params
+  ! ! NON-EQ CONTOUR PARAMETERS
+  ! !====================================================
+  ! type,public                          :: kb_contour_params
+  !    integer                           :: Ntime=0,Ntau=0 !Largest dimension of the contour
+  !    integer                           :: Lf=0           !Number of Matsubara Frequencies
+  !    integer                           :: Nt=0           !Actual time index
+  !    real(8)                           :: dt=0.d0        !real-time step
+  !    real(8)                           :: dtau=0.d0      !im-time step
+  !    real(8)                           :: time=0.d0      !actual time at it=Nt
+  !    real(8),dimension(:),allocatable  :: t              !real-time array
+  !    real(8),dimension(:),allocatable  :: tau            !im-time array
+  !    real(8),dimension(:),allocatable  :: wm             !matsubara freq. array
+  !    real(8)                           :: beta=0.d0      !length of the im-time interval
+  !    real(8)                           :: tmax=0.d0      !length of the real-time interval
+  !    logical                           :: status=.false. !allocation status
+  ! end type kb_contour_params
 
 
   ! KADANOFF-BAYM CONTOUR GREEN'S FUNCTIONS:
@@ -61,7 +63,7 @@ MODULE CONTOUR_GF
 
 
   interface assignment(=)
-     module procedure kb_contour_params_equality,&
+     module procedure &!kb_contour_params_equality,&
           kb_contour_gf_equality_,kb_contour_dgf_equality_,&
           kb_contour_gf_equality__,kb_contour_dgf_equality__
   end interface assignment(=)
@@ -84,10 +86,10 @@ MODULE CONTOUR_GF
   end interface kb_half_trapz
 
 
-  public :: allocate_kb_contour_params
+  !public :: allocate_kb_contour_params
   public :: allocate_kb_contour_gf
   public :: allocate_kb_contour_dgf
-  public :: deallocate_kb_contour_params
+  !public :: deallocate_kb_contour_params
   public :: deallocate_kb_contour_gf
   public :: deallocate_kb_contour_dgf
   !
@@ -123,30 +125,30 @@ contains
 
 
   !======= ALLOCATE ======= 
-  subroutine allocate_kb_contour_params(params,Ntime,Ntau,dt,beta,L)
-    type(kb_contour_params) :: params
-    integer,intent(in)      :: Ntime,Ntau
-    real(8),optional        :: dt,beta
-    integer,optional        :: L
-    if(allocated(params%t))deallocate(params%t)
-    if(allocated(params%tau))deallocate(params%tau)
-    params%Ntime= Ntime
-    params%Ntau = Ntau
-    params%Nt   = Ntime         !<== set the actual time_step to max_time
-    params%Lf   = 2048 ; if(present(L))params%Lf=L
-    allocate(params%t(Ntime))
-    allocate(params%tau(0:Ntau))
-    allocate(params%wm(params%Lf))
-    params%status=.true.
-    if(present(dt))then
-       params%dt=dt
-       params%tmax=dt*real(Ntime-1,8)
-    endif
-    if(present(beta))then
-       params%beta=beta
-       params%dtau=beta/real(Ntau,8)
-    endif
-  end subroutine allocate_kb_contour_params
+  ! subroutine allocate_kb_contour_params(params,Ntime,Ntau,dt,beta,L)
+  !   type(kb_contour_params) :: params
+  !   integer,intent(in)      :: Ntime,Ntau
+  !   real(8),optional        :: dt,beta
+  !   integer,optional        :: L
+  !   if(allocated(params%t))deallocate(params%t)
+  !   if(allocated(params%tau))deallocate(params%tau)
+  !   params%Ntime= Ntime
+  !   params%Ntau = Ntau
+  !   params%Nt   = Ntime         !<== set the actual time_step to max_time
+  !   params%Lf   = 2048 ; if(present(L))params%Lf=L
+  !   allocate(params%t(Ntime))
+  !   allocate(params%tau(0:Ntau))
+  !   allocate(params%wm(params%Lf))
+  !   params%status=.true.
+  !   if(present(dt))then
+  !      params%dt=dt
+  !      params%tmax=dt*real(Ntime-1,8)
+  !   endif
+  !   if(present(beta))then
+  !      params%beta=beta
+  !      params%dtau=beta/real(Ntau,8)
+  !   endif
+  ! end subroutine allocate_kb_contour_params
   !
   subroutine allocate_kb_contour_gf(G,params)
     type(kb_contour_gf)     :: G
@@ -196,17 +198,17 @@ contains
 
 
   !======= DEALLOCATE ======= 
-  subroutine deallocate_kb_contour_params(P)
-    type(kb_contour_params) :: P
-    if(.not.P%status)stop "contour_gf/deallocate_kb_contour_params: P not allocated"
-    deallocate(P%t,P%tau)
-    P%Ntime = 0
-    P%Ntau  = 0
-    P%Nt    = 0
-    P%dt    = 0.d0
-    P%dtau  = 0.d0
-    P%status=.false.
-  end subroutine deallocate_kb_contour_params
+  ! subroutine deallocate_kb_contour_params(P)
+  !   type(kb_contour_params) :: P
+  !   if(.not.P%status)stop "contour_gf/deallocate_kb_contour_params: P not allocated"
+  !   deallocate(P%t,P%tau)
+  !   P%Ntime = 0
+  !   P%Ntau  = 0
+  !   P%Nt    = 0
+  !   P%dt    = 0.d0
+  !   P%dtau  = 0.d0
+  !   P%status=.false.
+  ! end subroutine deallocate_kb_contour_params
   !
   subroutine deallocate_kb_contour_gf(G)
     type(kb_contour_gf) :: G
@@ -1195,22 +1197,22 @@ contains
 
 
   !======= OPERATIONS + & * ======= 
-  subroutine kb_contour_params_equality(P1,P2)
-    type(kb_contour_params),intent(inout) :: P1
-    type(kb_contour_params),intent(in)    :: P2
-    if(.not.P2%status)stop "contour_gf/kb_contour_params_equality: P2 not allocated"
-    if(P1%status)call deallocate_kb_contour_params(P1)
-    call allocate_kb_contour_params(P1,P2%Ntime,P2%Ntau)
-    P1%Ntime  = P2%Ntime
-    P1%Ntau   = P2%Ntau
-    P1%Nt     = P2%Nt
-    P1%dt     = P2%dt
-    P1%dtau   = P2%dtau
-    P1%time   = P2%time
-    P1%t(:)   = P2%t(:)
-    P1%tau(0:)= P2%tau(0:)
-    P1%wm(:)  = P2%wm(:)
-  end subroutine kb_contour_params_equality
+  ! subroutine kb_contour_params_equality(P1,P2)
+  !   type(kb_contour_params),intent(inout) :: P1
+  !   type(kb_contour_params),intent(in)    :: P2
+  !   if(.not.P2%status)stop "contour_gf/kb_contour_params_equality: P2 not allocated"
+  !   if(P1%status)call deallocate_kb_contour_params(P1)
+  !   call allocate_kb_contour_params(P1,P2%Ntime,P2%Ntau)
+  !   P1%Ntime  = P2%Ntime
+  !   P1%Ntau   = P2%Ntau
+  !   P1%Nt     = P2%Nt
+  !   P1%dt     = P2%dt
+  !   P1%dtau   = P2%dtau
+  !   P1%time   = P2%time
+  !   P1%t(:)   = P2%t(:)
+  !   P1%tau(0:)= P2%tau(0:)
+  !   P1%wm(:)  = P2%wm(:)
+  ! end subroutine kb_contour_params_equality
   !
   subroutine kb_contour_gf_equality_(G1,C)
     type(kb_contour_gf),intent(inout) :: G1
@@ -1341,5 +1343,5 @@ contains
 
 
 
-END MODULE CONTOUR_GF
+END MODULE NEQ_CONTOUR_GF
 

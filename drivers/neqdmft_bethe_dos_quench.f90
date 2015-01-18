@@ -1,16 +1,15 @@
-!###################################################################
-!PURPOSE  : Solve conduction band electrons driven 
-! by electric field interacting with a resevoir of free 
-! electrons at temperature T
-!AUTHORS  : Adriano Amaricci 
-!###################################################################
 program neqDMFT
-  USE SQUARE_LATTICE
-  USE NEQ_VARS_GLOBAL   !global variables, calls to 3rd library 
-  USE NEQ_THERMOSTAT    !contains bath inizialization
+  !USE NEQ_DMFT_IPT
+  USE NEQ_CONTOUR
+  USE NEQ_CONTOUR_GF
+  USE NEQ_VARS_GLOBAL
+
+  USE SCIFOR
+  USE DMFT_TOOLS
   implicit none
-  integer                               :: i,j,ik,itime,iloop,ix,iy
+  integer                               :: i,j,ik,itime,iloop,ix,iy,Lk
   logical                               :: converged
+  real(8)                               :: wband
   character(len=16)                     :: finput
   type(kb_contour_gf)                   :: Sbath
   type(kb_contour_gf)                   :: Gloc,Sigma,Gwf
@@ -21,34 +20,38 @@ program neqDMFT
   complex(8),dimension(:,:),allocatable :: Ham
   complex(8)                            :: sigma_gtr
   !RESULTS:
+  real(8),dimension(:),allocatable      :: epsik,wt
   real(8),dimension(:,:),allocatable    :: nk
   real(8)                               :: D,de,intwt
 
   !READ THE INPUT FILE (in vars_global):
-  call parse_cmd_variable(finput,"FINPUT",default='inputNEQ.in')
+  call parse_cmd_variable(finput,"FINPUT",default='inputNEQ.conf')
+  call parse_input_variable(wband,"wband",finput,default=2d0,comment="half-bandwidth W=2t")
+  call parse_input_variable(Lk,"Lk",finput,default=100,comment="Number of energy levels for Bethe DOS")
   call read_input_init(trim(finput))
 
 
   !BUILD THE LATTICE STRUCTURE (in lib/square_lattice):
-  Lk=Nx
-  D=2.d0*ts
   allocate(epsik(Lk),wt(Lk))
-  epsik = linspace(-D,D,Lk,mesh=de)
+  epsik = linspace(-wband,wband,Lk,mesh=de)
   do i=1,Lk
-     wt(i) = dens_bethe(epsik(i),D)
+     wt(i) = dens_bethe(epsik(i),wband)
   enddo
   call splot("DOSbethe.ipt",epsik,wt)
-  intwt=sum(wt)*de
-  wt=wt*de/intwt
+  wt=wt/sum(wt)
 
 
   !BUILD TIME GRIDS AND NEQ-PARAMETERS:
-  call allocate_kb_contour_params(cc_params,Ntime,Ntau,dt,beta,Lfreq)
-  cc_params%t = linspace(0.d0,cc_params%tmax,cc_params%Ntime,mesh=dt)
-  cc_params%tau(0:) = linspace(0.d0,cc_params%beta,cc_params%Ntau+1,mesh=dtau)
-  cc_params%wm  = pi/cc_params%beta*dble(2*arange(1,cc_params%Lf)-1)
-  print*,"dt=",cc_params%dt
-  print*,"dtau=",cc_params%dtau
+  !=====================================================================
+  call allocate_kb_contour_params(cc_params,Ntime,Ntau,Lfreq)
+  call setup_kb_contour_params(cc_params,dt,beta)
+  ! !BUILD TIME GRIDS AND NEQ-PARAMETERS:
+  ! call allocate_kb_contour_params(cc_params,Ntime,Ntau,dt,beta,Lfreq)
+  ! cc_params%t = linspace(0.d0,cc_params%tmax,cc_params%Ntime,mesh=dt)
+  ! cc_params%tau(0:) = linspace(0.d0,cc_params%beta,cc_params%Ntau+1,mesh=dtau)
+  ! cc_params%wm  = pi/cc_params%beta*dble(2*arange(1,cc_params%Lf)-1)
+  ! print*,"dt=",cc_params%dt
+  ! print*,"dtau=",cc_params%dtau
 
 
   !ALLOCATE ALL THE FUNCTIONS INVOLVED IN THE CALCULATION:
@@ -110,7 +113,9 @@ program neqDMFT
         call neq_solve_ipt(Gwf,Sigma,cc_params)
 
         !PERFORM THE SELF_CONSISTENCY: get local GF + update Weiss-Field
-        Gedge=zero
+        Gedge%ret(1:itime)=zero
+        Gedge%less(1:itime)=zero
+        Gedge%lmix(0:)=zero
         do ik=1,Lk
            call vide_kb_contour_gf(Ham(:,ik),Sigma,Gk(ik),dGk_old(ik),dGk(ik),cc_params)
            Gedge%ret(1:itime) = Gedge%ret(1:itime)  + wt(ik)*Gk(ik)%ret(itime,1:itime)
@@ -125,16 +130,14 @@ program neqDMFT
 
         !update the weiss field by solving the integral equation:
         ! G0 + K*G0 = Q , with K = G*\Sigma and Q = G
-        call convolute_kb_contour_gf(Gloc,Sigma,Ker,cc_params,sign=-1.d0)
+        call convolute_kb_contour_gf(Gloc,Sigma,Ker,cc_params,dcoeff=-1.d0)
         call vie_kb_contour_gf(Gloc,Ker,Gwf,cc_params)
         !
         !CHECK CONVERGENCE
         converged = convergence_check(Gwf,cc_params)
      enddo
 
-     call plot_kb_contour_gf("Sigma",Sigma,cc_params)
-     call plot_kb_contour_gf("Gloc",Gloc,cc_params)
-     call plot_kb_contour_gf("G0",Gwf,cc_params)
+
 
      !EVALUATE AND PRINT THE RESULTS OF THE CALCULATION
      call measure_observables(Gloc,Sigma,cc_params)
@@ -143,11 +146,11 @@ program neqDMFT
 
 
   !EVALUATE AND PRINT OTHER RESULTS OF THE CALCULATION
-  call splot3d("nkVSepsikVStime.plot",cc_params%t,epsik,nk)
-
+  call splot3d("nkVSepsikVStime.ipt",cc_params%t,epsik,nk)
+  call plot_kb_contour_gf("Sigma.ipt",Sigma,cc_params)
+  call plot_kb_contour_gf("Gloc.ipt",Gloc,cc_params)
+  call plot_kb_contour_gf("G0.ipt",Gwf,cc_params)
   print*,"BRAVO"
-
-
 
 
 contains
@@ -168,6 +171,7 @@ contains
     complex(8)                          :: zeta
     complex(8)                          :: Self_gtr
     complex(8),allocatable,dimension(:) :: SxG
+    real(8)                             :: Scoeff(2),Gcoeff(4)
     Lk=size(gk)
     if(.not.g0%status)stop "init_functions: g0 is not allocated"
     if(.not.g%status)stop "init_functions: g is not allocated"
@@ -208,7 +212,9 @@ contains
     endif
     !
     !INITIALIZE THE WEISS FIELD G0^{x=M,<,R,\lmix}
-    call fftgf_iw2tau(g0%iw,g0%mats(0:),params%beta)
+    Gcoeff = tail_coeff_glat(U,0.5d0,0d0,0d0)
+    call fft_gf_iw2tau(g0%iw,g0%mats(0:),params%beta,Gcoeff)
+    ! call fftgf_iw2tau(g0%iw,g0%mats(0:),params%beta)
     g0%less(1,1) = -xi*g0%mats(L)
     g0%ret(1,1)  = -xi
     forall(i=0:L)g0%lmix(1,i)=-xi*g0%mats(L-i)
@@ -223,7 +229,9 @@ contains
     do j=0,L
        Self%mats(j) = Ui*Ui*g0%mats(j)*g0%mats(L-j)*g0%mats(j)
     end do
-    call fftgf_tau2iw(Self%mats(0:),Self%iw,beta)
+    Scoeff  = tail_coeff_sigma(Ui,0.5d0)
+    call fft_sigma_tau2iw(Self%iw,Self%mats(0:),beta,Scoeff)
+    ! call fftgf_tau2iw(Self%mats(0:),Self%iw,beta)
     Self%iw = xi*dimag(self%iw) !!ACTHUNG: imposing half-filling symmetry
     Self%less(1,1)=(xi**3)*U*U*g0%mats(L)*g0%mats(0)*g0%mats(L)
     Self_gtr      =(xi**3)*U*U*g0%mats(0)*g0%mats(L)*g0%mats(0)
@@ -233,7 +241,7 @@ contains
     Self%ret(1,1) = Self_gtr - Self%less(1,1)
     !   
     do ik=1,Lk 
-       call setup_initial_conditions(self,gk(ik),dgk(ik),ik,params)
+       call setup_initial_conditions(self,gk(ik),dgk(ik),epsik(ik),params)
        G%mats(0:)  = G%mats(0:)  + wt(ik)*gk(ik)%mats(0:)
        G%iw(:)     = G%iw(:)     + wt(ik)*gk(ik)%iw(:)
        G%ret(1,1)  = G%ret(1,1)  + wt(ik)*gk(ik)%ret(1,1)
@@ -245,33 +253,33 @@ contains
 
 
 
-  subroutine setup_initial_conditions(Self,Gk,dGk,ik,params)
+  subroutine setup_initial_conditions(Self,Gk,dGk,hk,params)
     type(kb_contour_gf)                 :: Gk,Self
     type(kb_contour_dgf)                :: dGk
-    integer                             :: ik
+    real(8)                             :: hk
     type(kb_contour_params)             :: params
     integer                             :: i,j,k,Ltau
     real(8)                             :: nktmp
     complex(8),allocatable,dimension(:) :: SxG
     Ltau  = params%Ntau
-    Gk%iw = one/(xi*params%wm - epsik(ik) - self%iw)          !get G_k(iw) 
-    !
-    call fftgf_iw2tau(Gk%iw,Gk%mats(0:),beta)        !get G_k(tau)
+    Gk%iw = one/(xi*params%wm - hk - self%iw)          !get G_k(iw) 
+    call fft_gf_iw2tau(Gk%iw,Gk%mats(0:),beta)        !get G_k(tau)
     nktmp = -Gk%mats(Ltau)                           !n(k,t=0)=-G^M_k(beta)=G^M_k(0-)
     Gk%less(1,1) =  xi*nktmp                         !get G^<_k(0,0)= xi*G^M_k(0-)
     Gk%ret(1,1)  = -xi                               !get G^R_k(0,0)=-xi
     forall(i=0:Ltau)Gk%lmix(1,i)=-xi*Gk%mats(Ltau-i) !get G^\lmix_k(0,tau)=xi*G_k(tau<0)=-xi*G_k(beta-tau>0)
+    !
     !Derivatives
     allocate(SxG(0:Ltau))
     !get d/dt G_k^R = -i*e(k,0)G_k^R
-    dGk%ret(1)  = -xi*epsik(ik)*Gk%ret(1,1)            
+    dGk%ret(1)  = -xi*hk*Gk%ret(1,1)            
     !get d/dt G_k^< = -i*e(k,0)G_k^< -xi(-xi)int_0^beta S^\lmix*G_k^\rmix
     do k=0,Ltau
        SxG(k)=Self%lmix(1,k)*conjg(Gk%lmix(1,Ltau-k))
     end do
-    dGk%less(1) = -xi*epsik(ik)*Gk%less(1,1)-xi*(-xi)*params%dtau*kb_trapz(SxG(0:),0,Ltau) 
+    dGk%less(1) = -xi*hk*Gk%less(1,1)-xi*(-xi)*params%dtau*kb_trapz(SxG(0:),0,Ltau) 
     !get d/dt G_k^\lmix = -xi*e(k,0)*G_k^\lmix - xi*int_0^beta G_k^\lmix*G_k^M
-    dGk%lmix(0:)= -xi*epsik(ik)*Gk%lmix(1,0:)
+    dGk%lmix(0:)= -xi*hk*Gk%lmix(1,0:)
     do j=0,Ltau
        do k=0,j
           SxG(k)=Self%lmix(1,k)*Gk%mats(Ltau+k-j)
@@ -356,7 +364,7 @@ contains
     allocate(G0_gtr(N,N),Sigma_gtr(N,N))
     G0_gtr(N,1:N)=G0%less(N,1:N)+ G0%ret(N,1:N)
     G0_gtr(1:N-1,N)=G0%less(1:N-1,n)-conjg(G0%ret(N,1:N-1))
-          !
+    !
     !Vertical edge
     do j=1,N
        Sigma%less(N,j)= U*U*G0%less(N,j)*G0_gtr(j,N)*G0%less(N,j)
@@ -467,7 +475,7 @@ contains
     if(N==1)then
        if(ui/=0.d0)then
           do k=0,L
-             SxG(k)=Self%mats(L-i)*G%mats(i)
+             SxG(k)=Self%mats(L-k)*G%mats(k)
           end do
           docc=docc-1.d0/Ui*params%dtau*kb_trapz(SxG(0:),0,L)
        endif

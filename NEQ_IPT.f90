@@ -1,8 +1,6 @@
-!###############################################################
-!     PURPOSE  : A non-equilibrium IPT solver module. 
-!###############################################################
 module NEQ_IPT
-  USE MATRIX
+  USE NEQ_CONTOUR
+  USE NEQ_CONTOUR_GF
   USE NEQ_VARS_GLOBAL
   implicit none
   private

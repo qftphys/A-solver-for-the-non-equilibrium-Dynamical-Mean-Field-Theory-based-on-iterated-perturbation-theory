@@ -4,6 +4,11 @@
 !###############################################################
 module NEQ_THERMOSTAT
   USE NEQ_VARS_GLOBAL
+  USE NEQ_CONTOUR
+  USE NEQ_CONTOUR_GF
+  USE ARRAYS
+  USE FUNCTIONS
+  USE IOTOOLS
   implicit none
   private
   real(8),allocatable,dimension(:) :: bath_dens,wfreq

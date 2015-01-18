@@ -4,6 +4,10 @@
 !#####################################################################
 MODULE ELECTRIC_FIELD
   USE NEQ_VARS_GLOBAL
+  USE CONSTANTS
+  USE FUNCTIONS
+  USE DERIVATE
+  USE IOTOOLS
   implicit none
   private
   public :: Afield

@@ -2,11 +2,8 @@ FC=gfortran
 #PRECOMPILATION FLAG (leave blank for serial code)
 FPP=
 
-EXE=neqdmft_bethe
-#EXE=neqdmft_bethe_2bands
-#EXE=neqdmft_lattice_2bands
-#EXE=neqdmft_bethe_dos
-#EXE=neqdmft_hypercubic
+#EXE=neqdmft_bethe_quench
+EXE=neqdmft_bethe_dos_quench
 #EXE=neqdmft_2dsquare_quench
 #EXE=neqdmft_2dsquare_field
 
@@ -21,7 +18,7 @@ BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 VER = 'character(len=41),parameter :: revision = "$(REV)"' > revision.inc
 
 
-OBJS =  CONTOUR_GF.o NEQ_VARS_GLOBAL.o ELECTRIC_FIELD.o NEQ_THERMOSTAT.o NEQ_IPT.o
+OBJS =  NEQ_CONTOUR.o NEQ_CONTOUR_GF.o NEQ_INPUT_VARS.o ELECTRIC_FIELD.o NEQ_THERMOSTAT.o NEQ_AUX_FUNX.o NEQ_MEASURE.o NEQ_IPT.o NEQ_DMFT_IPT.o
 
 #MKLARGS=-lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm
 
