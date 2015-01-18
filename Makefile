@@ -3,9 +3,9 @@ FC=gfortran
 FPP=
 
 #EXE=neqdmft_bethe_quench
-EXE=neqdmft_bethe_dos_quench
+#EXE=neqdmft_bethe_dos_quench
 #EXE=neqdmft_2dsquare_quench
-#EXE=neqdmft_2dsquare_field
+EXE=neqdmft_2dsquare_field
 
 
 

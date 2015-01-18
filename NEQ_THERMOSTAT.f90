@@ -36,14 +36,14 @@ contains
     if(.not.S0%status)stop "thermostat/get_thermostat_bath: S0 not allocated. "
     N = params%Ntime      !<== work with the MAX size of the contour
     L = params%Ntau
-
+    
     write(*,"(A)")"Bath coupling is:"//txtfy(Vbath)
     Vhopping=sqrt(Vbath*2.d0*Wbath)
     write(*,"(A)")"Bath hopping, width are:"//reg(txtfy(Vhopping))//","//reg(txtfy(2.d0*Wbath))
 
-    allocate(bath_dens(Lfreq),wfreq(Lfreq))
+    allocate(bath_dens(Lbath),wfreq(Lbath))
     wmax  = Wbath
-    wfreq = linspace(-wmax,wmax,Lfreq,mesh=dw)
+    wfreq = linspace(-wmax,wmax,Lbath,mesh=dw)
     select case(reg(bath_type))
     case("bethe")
        call get_bath_bethe_dos()
@@ -69,7 +69,7 @@ contains
     S0   = zero
     S0gtr= zero
     if(Vbath==0.d0)return
-    do iw=1,Lfreq
+    do iw=1,Lbath
        en   = wfreq(iw)
        nless= fermi(en,beta)
        ngtr = fermi(en,beta)-1.d0 !it absorbs the minus sign of the greater functions
@@ -106,7 +106,7 @@ contains
     !Ret component:
     S0%ret = S0gtr-S0%less
     forall(i=1:params%Ntime,j=1:params%Ntime,i<j)S0%less(i,j)=-conjg(S0%less(j,i))
-    call plot_kb_contour_gf("Sbath",S0,params)
+    call plot_kb_contour_gf("Sbath.ipt",S0,params)
   end subroutine get_thermostat_bath
 
 
@@ -121,7 +121,7 @@ contains
   subroutine get_bath_flat_dos()
     integer    :: i
     real(8)    :: w
-    do i=1,Lfreq
+    do i=1,Lbath
        w=wfreq(i)
        bath_dens(i)= step(Wbath-abs(w))/(2.d0*Wbath)
     enddo
@@ -131,7 +131,7 @@ contains
     integer    :: i
     real(8)    :: w,norm
     norm=(Walpha+1.d0)/(2.d0*Wbath**(Walpha+1.d0))
-    do i=1,Lfreq
+    do i=1,Lbath
        w=wfreq(i)
        if(abs(w)>wbath)then
           bath_dens(i)=0.d0
@@ -145,7 +145,7 @@ contains
     integer    :: i
     real(8)    :: w,rho
     rho=1.d0/2.d0/(Wbath)!-Wgap)
-    do i=1,Lfreq
+    do i=1,Lbath
        w=wfreq(i)
        if(abs(w)<Wbath+Wgap.AND.abs(w)>Wgap)then
           bath_dens(i)=rho
@@ -175,7 +175,7 @@ contains
     integer    :: i,ik
     real(8)    :: w,sig,alpha
     complex(8) :: gf,zeta
-    do i=1,Lfreq
+    do i=1,Lbath
        w=wfreq(i)
        zeta=cmplx(w,eps,8)
        gf=gfbether(w,zeta,wbath/2.d0)

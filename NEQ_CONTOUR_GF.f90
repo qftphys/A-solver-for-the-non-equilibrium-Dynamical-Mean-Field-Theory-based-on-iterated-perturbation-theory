@@ -459,7 +459,7 @@ contains
     type(kb_contour_params) :: params
     integer                 :: Nt
     if(.not.G%status)stop "contour_gf/plot_kb_contour_gf: G is not allocated" 
-    Nt=params%Nt
+    Nt=params%Ntime
     call splot3d(reg(file)//"_less_t_t.plot",params%t(:Nt),params%t(:Nt),G%less(:Nt,:Nt))
     call splot3d(reg(file)//"_ret_t_t.plot",params%t(:Nt),params%t(:Nt),G%ret(:Nt,:Nt))
     call splot3d(reg(file)//"_lmix_t_tau.plot",params%t(:Nt),params%tau(0:),G%lmix(:Nt,0:))
@@ -473,7 +473,7 @@ contains
     type(kb_contour_params) :: params
     integer                 :: Nt
     if(.not.dG%status)stop "contour_gf/plot_kb_contour_gf: G is not allocated" 
-    Nt=params%Nt
+    Nt=params%Ntime
     call splot(reg(file)//"_less_t.plot",params%t(:Nt),dG%less(:Nt))
     call splot(reg(file)//"_ret_t.plot",params%t(:Nt),dG%ret(:Nt))
     call splot(reg(file)//"_lmix_tau.plot",params%tau(0:),dG%lmix(0:))
