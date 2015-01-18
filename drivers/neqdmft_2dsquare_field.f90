@@ -1,73 +1,64 @@
-!###################################################################
-!PURPOSE  : Solve conduction band electrons driven 
-! by electric field interacting with a resevoir of free 
-! electrons at temperature T
-!AUTHORS  : Adriano Amaricci 
-!###################################################################
-include "SQUARE_LATTICE.f90"
 program neqDMFT
-  !USE NEQ_DMFT_IPT
-  USE NEQ_CONTOUR
-  USE NEQ_CONTOUR_GF
-  USE NEQ_VARS_GLOBAL
-  USE ELECTRIC_FIELD
-  USE NEQ_THERMOSTAT
-  USE NEQ_AUX_FUNX
-  USE NEQ_MEASURE
-  USE NEQ_IPT
-  !
+  USE NEQ_DMFT_IPT
   USE SCIFOR
-  USE DMFT_TOOLS, only: sum_overk_zeta, get_free_dos, check_convergence
-  USE FFTGF
-  !
-  USE SQUARE_LATTICE
-
+  USE DMFT_TOOLS
   implicit none
-  integer           :: i,j,ik,itime,iloop,ix,iy,Lk,Nx
-  logical           :: converged
-  real(8) :: ts
-  character(len=16) :: finput
-  type(kb_contour_gf)                 :: Sbath
-  type(kb_contour_gf)                 :: Gloc,Sigma,Gwf
-  type(kb_contour_gf)                 :: Ker
-  type(kb_contour_gf),allocatable     :: Gk(:)
-  type(kb_contour_dgf),allocatable    :: dGk(:),dGk_old(:)
-  type(kb_contour_dgf)                :: Gedge
-  complex(8),dimension(:),allocatable :: Ham
+  integer                               :: i,j,ik,itime,iloop,ix,iy,iz,Lk,Nx
+  logical                               :: converged
+  real(8)                               :: ts,kx,ky,time
+  character(len=16)                     :: finput
+  type(kb_contour_gf)                   :: Sbath
+  type(kb_contour_gf)                   :: Gloc,Sigma,Gwf
+  type(kb_contour_gf)                   :: Ker
+  type(kb_contour_gf),allocatable       :: Gk(:)
+  type(kb_contour_dgf),allocatable      :: dGk(:),dGk_old(:)
+  type(kb_contour_dgf)                  :: Gedge
+  complex(8),dimension(:),allocatable   :: Ham
   !RESULTS:
-  real(8),dimension(:),allocatable      :: epsik,wt
+  complex(8),dimension(:,:),allocatable :: Hk
+  real(8),dimension(:,:,:),allocatable  :: Vk
+  real(8),dimension(:),allocatable      :: kxgrid,kygrid,Wt,Epsik
   real(8),dimension(:,:,:),allocatable  :: nDens
   real(8),dimension(:,:),allocatable    :: nk
+
 
   !READ THE INPUT FILE (in vars_global):
   call parse_cmd_variable(finput,"FINPUT",default='inputNEQ.conf')
   call parse_input_variable(ts,"ts",finput,default=1d0,comment="hopping")
-  call parse_input_variable(Nx,"Lk",finput,default=20,comment="Number of k-points")
+  call parse_input_variable(Nx,"Nx",finput,default=21,comment="Number of k-points")
   call read_input_init(trim(finput))
-
-
-  !BUILD THE LATTICE STRUCTURE (in lib/square_lattice):
-  Lk   = square_lattice_dimension(Nx,Nx)
-  allocate(epsik(Lk),wt(Lk))
-  wt   = square_lattice_structure(Lk,Nx,Nx)
-  epsik= square_lattice_dispersion_array(Lk,ts)
-  call get_free_dos(epsik,wt)
 
 
   !BUILD TIME GRIDS AND NEQ-PARAMETERS:
   call allocate_kb_contour_params(cc_params,Ntime,Ntau,Lfreq)
   call setup_kb_contour_params(cc_params,dt,beta)
-  ! call allocate_kb_contour_params(cc_params,Ntime,Ntau,dt,beta,Lfreq)
-  ! cc_params%t = linspace(0.d0,cc_params%tmax,cc_params%Ntime,mesh=dt)
-  ! cc_params%tau(0:) = linspace(0.d0,cc_params%beta,cc_params%Ntau+1,mesh=dtau)
-  ! cc_params%wm  = pi/cc_params%beta*dble(2*arange(1,cc_params%Lf)-1)
-  ! print*,"dt=",dt,cc_params%dt
-  ! print*,"dtau=",dtau,cc_params%dtau
 
 
   !SET THE ELECTRIC FIELD (in electric_field):
-  call set_efield_vector()
-  call print_field(cc_params%t)
+  call set_efield_vector(cc_params%t)
+
+  !BUILD THE LATTICE STRUCTURE (use tight_binding):
+  Lk = Nx*Nx
+  allocate(Epsik(Lk),Wt(Lk))
+  allocate(Hk(Ntime,Lk),Vk(Ntime,Lk,2))
+  allocate(kxgrid(Nx),kygrid(Nx))
+  write(*,*) "Using Nk_total="//txtfy(Lk)
+  kxgrid = kgrid(Nx)
+  kygrid = kgrid(Nx)
+  Epsik  = build_hk_model(Lk,hk_model,kxgrid,kygrid,[0d0])
+  Wt     = 1d0/Lk
+  call write_hk_w90("Hk2d.dat",1,2,1,dcmplx(Epsik,0d0),kxgrid,kygrid,[0d0])
+  call get_free_dos(Epsik,Wt)
+  do i=1,cc_params%Ntime
+     do ik=1,Lk
+        call indx2coord(ik,ix,iy,iz,[Nx,Nx,1])
+        kx=kxgrid(ix)
+        ky=kygrid(iy)
+        Hk(i,ik)   = hkt_model([kx,ky],cc_params%t(i))
+        Vk(i,ik,:) = vk_model([kx,ky],cc_params%t(i))
+     enddo
+  enddo
+
 
 
   !SET THE THERMOSTAT FUNCTION (in neq_thermostat):
@@ -99,11 +90,10 @@ program neqDMFT
   Gloc = zero
   call neq_continue_equilibirum(Gwf,Gk,dGk,Gloc,Sigma,epsik,wt,cc_params)
   call measure_observables(Gloc,Sigma,cc_params)
-  call measure_current(Gk(:),cc_params)
+  call measure_current(Gk,Vk,Wt,cc_params)
   do ik=1,Lk
      nk(1,ik)=dimag(Gk(ik)%less(1,1))
   enddo
-
 
 
   !START THE TIME_STEP LOOP  1<t<=Nt
@@ -132,9 +122,7 @@ program neqDMFT
         call add_kb_contour_gf(Sbath,Sigma,Ker,cc_params)
         Gedge=zero
         do ik=1,Lk
-           do i=1,itime
-              ham(i)=hamkt(ik,i,cc_params)
-           enddo
+           Ham = Hk(:,ik)
            call vide_kb_contour_gf(Ham,Ker,Gk(ik),dGk_old(ik),dGk(ik),cc_params)
            Gedge%ret(1:itime) = Gedge%ret(1:itime)  + wt(ik)*Gk(ik)%ret(itime,1:itime)
            Gedge%less(1:itime)= Gedge%less(1:itime) + wt(ik)*Gk(ik)%less(itime,1:itime)
@@ -156,15 +144,22 @@ program neqDMFT
 
      !EVALUATE AND PRINT THE RESULTS OF THE CALCULATION
      call measure_observables(Gloc,Sigma,cc_params)
-     call measure_current(Gk(:),cc_params)
+     call measure_current(Gk,Vk,Wt,cc_params)
+     !call measure_current(Gk(:),cc_params)
      forall(ik=1:Lk)nk(itime,ik)=dimag(Gk(ik)%less(itime,itime))
   enddo
 
 
   !EVALUATE AND PRINT THE RESULTS OF THE CALCULATION
-  allocate(ndens(0:Nx,0:Nx,cc_params%Ntime))
-  forall(i=1:cc_params%Ntime,ik=1:Lk)nDens(ik2ix(ik),ik2iy(ik),i)=nk(i,ik)
-  call splot3d("3dFSVSpiVSt.plot",kgrid(0:Nx,0)%x,kgrid(0,0:Nx)%y,nDens(0:Nx,0:Nx,:))
+  allocate(ndens(1:Nx,1:Nx,cc_params%Ntime))
+  do i=1,cc_params%Ntime
+     do ik=1,Lk
+        ix = indx2ix(ik,[Nx,Nx,1])
+        iy = indx2iy(ik,[Nx,Nx,1])
+        nDens(ix,iy,i)=nk(i,ik)
+     enddo
+  enddo
+  call splot3d("3dFSVSpiVSt.ipt",kxgrid,kygrid,nDens(:,:,:))
   call splot3d("nkVSepsikVStime.ipt",cc_params%t,epsik,nk)
   call plot_kb_contour_gf("Sigma.ipt",Sigma,cc_params)
   call plot_kb_contour_gf("Gloc.ipt",Gloc,cc_params)
@@ -177,6 +172,76 @@ program neqDMFT
 
 contains
 
+
+  function hk_model(kpoint) result(hk)
+    real(8),dimension(:) :: kpoint
+    integer              :: N
+    real(8)              :: kx,ky
+    complex(8)           :: hk
+    kx=kpoint(1)
+    ky=kpoint(2)
+    Hk = -one*2d0*ts*(cos(kx)+cos(ky))
+  end function hk_model
+
+  function hkt_model(kpoint,time) result(hk)
+    real(8),dimension(:) :: kpoint
+    real(8),dimension(3) :: Ak
+    real(8)              :: time
+    integer              :: ik
+    real(8)              :: kx,ky
+    complex(8)           :: hk
+    Ak = Afield(time)
+    kx=kpoint(1) - Ak(1)
+    ky=kpoint(2) - Ak(2)
+    hk = hk_model([kx,ky])
+  end function Hkt_Model
+
+  function Vk_model(kpoint,time) result(vel)
+    real(8),dimension(:)               :: kpoint
+    real(8),dimension(3)               :: Ak
+    real(8)                            :: time
+    integer                            :: ik
+    real(8)                            :: kx,ky
+    complex(8),dimension(size(kpoint)) :: vel
+    Ak = Afield(time)
+    kx=kpoint(1) - Ak(1)
+    ky=kpoint(2) - Ak(2)
+    vel(1) = 2d0*ts*sin(kx)
+    vel(2) = 2d0*ts*sin(ky)
+  end function Vk_model
+
+
+
+
+
+
+  !+-------------------------------------------------------------------+
+  !PURPOSE  : check convergence of the calculation:
+  !+-------------------------------------------------------------------+
+  function convergence_check(G,params) result(converged)
+    type(kb_contour_gf)                 :: G
+    type(kb_contour_params)             :: params
+    logical                             :: converged
+    complex(8),dimension(:),allocatable :: test_func
+    integer :: N,L,Ntot
+    !
+    N   = params%Nt                 !<== work with the ACTUAL size of the contour
+    L   = params%Ntau
+    !
+    Ntot=2*N+L+1
+    allocate(test_func(Ntot))
+    test_func=zero
+    do i=1,N
+       test_func(i)  = G%ret(N,i)
+       test_func(N+i)= G%less(N,i)
+    enddo
+    do i=0,L
+       test_func(2*N+i+1)=G%lmix(N,i)
+    enddo
+    converged=check_convergence(test_func,dmft_error,Nsuccess,nloop)
+    deallocate(test_func)
+    !if(isnan(err))stop "Aborted convergence: error=NaN"
+  end function convergence_check
 
 
 
@@ -414,18 +479,6 @@ contains
 
 
 
-  function Hamkt(ik,it,params) result(hk)
-    integer                 :: ik,N
-    type(kb_contour_params) :: params
-    integer                 :: ix,iy,it
-    type(vect2D)            :: kt,Ak
-    complex(8)              :: hk
-    ix = ik2ix(ik)
-    iy = ik2iy(ik)
-    Ak = Afield(params%t(it),Ek)
-    kt = kgrid(ix,iy) - Ak
-    hk = one*square_lattice_dispersion(kt)
-  end function Hamkt
 
 
 
@@ -436,65 +489,40 @@ contains
 
 
 
-  !+-------------------------------------------------------------------+
-  !PURPOSE  : check convergence of the calculation:
-  !+-------------------------------------------------------------------+
-  function convergence_check(G,params) result(converged)
-    type(kb_contour_gf)                 :: G
-    type(kb_contour_params)             :: params
-    logical                             :: converged
-    complex(8),dimension(:),allocatable :: test_func
-    integer :: N,L,Ntot
-    !
-    N   = params%Nt                 !<== work with the ACTUAL size of the contour
-    L   = params%Ntau
-    !
-    Ntot=2*N+L+1
-    allocate(test_func(Ntot))
-    test_func=zero
-    do i=1,N
-       test_func(i)  = G%ret(N,i)
-       test_func(N+i)= G%less(N,i)
-    enddo
-    do i=0,L
-       test_func(2*N+i+1)=G%lmix(N,i)
-    enddo
-    converged=check_convergence(test_func,dmft_error,Nsuccess,nloop)
-    deallocate(test_func)
-    !if(isnan(err))stop "Aborted convergence: error=NaN"
-  end function convergence_check
 
 
 
 
-  !+-------------------------------------------------------------------+
-  !PURPOSE: measure some observables and print them
-  !+-------------------------------------------------------------------+
-  subroutine measure_current(gk,params)
-    type(kb_contour_gf)                   :: gk(:)
-    type(kb_contour_params)               :: params
-    integer                               :: unit,itime,Lk,ix,iy,ik
-    type(vect2D)                          :: kt,Ak,Jloc
-    real(8)                               :: dens,docc,ekin,epot,etot,nk
-    Lk=size(gk)
-    itime = params%Nt
-    unit = free_unit()
-    open(unit,file="current.info")
-    write(unit,"(8A20)")"time","Jx","Jy","Jz"
-    close(unit)
-    open(unit,file="current.ipt",position="append")
-    Jloc=Vzero
-    do ik=1,Lk
-       ix=ik2ix(ik)
-       iy=ik2iy(ik)
-       nk = dimag(Gk(ik)%less(itime,itime))
-       Ak   = Afield(cc_params%t(itime),Ek)
-       kt   = kgrid(ix,iy) - Ak
-       Jloc = Jloc +  wt(ik)*nk*square_lattice_velocity(kt)
-    enddo
-    write(unit,"(4F20.12)")params%t(itime),Jloc%x,Jloc%y
-    close(unit)
-  end subroutine measure_current
+  ! !+-------------------------------------------------------------------+
+  ! !PURPOSE: measure some observables and print them
+  ! !+-------------------------------------------------------------------+
+  ! subroutine measure_current(gk,Vkt_,Wtk_,params)
+  !   type(kb_contour_gf)                   :: gk(:)
+  !   real(8),dimension(:,:,:)       :: Vkt_
+  !   real(8),dimension(:)           :: wtk_
+  !   type(kb_contour_params)               :: params
+  !   integer                               :: unit,itime,Lk,ix,iy,ik
+  !   ! type(vect2D)                          :: Ak
+  !   real(8)                               :: nk,Jloc(2)!,Ak(3)
+  !   Lk=size(gk)
+  !   itime = params%Nt
+  !   unit = free_unit()
+  !   open(unit,file="current.info")
+  !   write(unit,"(8A20)")"time","Jx","Jy","Jz"
+  !   close(unit)
+  !   open(unit,file="current.ipt",position="append")
+  !   Jloc=0d0
+  !   do ik=1,Lk
+  !      nk = dimag(Gk(ik)%less(itime,itime))
+  !      ! Ak   = Afield(cc_params%t(itime))
+  !      ! call indx2coord(ik,ix,iy,iz,[Nx,Nx,1])
+  !      ! kx=kxgrid(ix) - Ak(1)!%x
+  !      ! ky=kygrid(iy) - Ak(2)!%y
+  !      Jloc = Jloc +  wt(ik)*nk*Vk(itime,ik,:)
+  !   enddo
+  !   write(unit,"(4F20.12)")params%t(itime),Jloc(1),Jloc(2)
+  !   close(unit)
+  ! end subroutine measure_current
 
 
 

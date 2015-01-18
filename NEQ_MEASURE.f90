@@ -16,7 +16,7 @@ MODULE NEQ_MEASURE
   public :: measure_ekin
   public :: measure_epot
   public :: measure_etot
-
+  public :: measure_current
 
 contains
 
@@ -46,38 +46,40 @@ contains
     close(unit)
   end subroutine measure_observables
 
-  ! !+-------------------------------------------------------------------+
-  ! !PURPOSE: measure current
-  ! !+-------------------------------------------------------------------+
-  ! subroutine neq_measure_current(Gk,Vkt,Wtk,params)
-  !   type(kb_contour_gf)            :: gk(:)
-  !   real(8),dimension(:,:,:)       :: Vkt
-  !   real(8),dimension(:)           :: wtk
-  !   type(kb_contour_params)        :: params
-  !   integer                        :: unit,itime,Lk,ik,i
-  !   real(8),dimension(size(Vkt,3)) :: Kt,Ak,Jloc
-  !   real(8)                        :: nkt
-  !   !
-  !   Lk=size(gk)
-  !   itime = params%Nt
-  !   !
-  !   if(size(Vkt,1)<params%Ntime)stop "neq_measure_current: dim(Vkt,2) < Ntime"
-  !   if(size(Vkt,2)/=Lk)stop "neq_measure_current: dim(Vkt,3) != Lk"
-  !   !
-  !   unit = free_unit()
-  !   open(unit,file="current.info")
-  !   write(unit,"(8A20)")"time","Jx","Jy","Jz"
-  !   close(unit)
-  !   !
-  !   open(unit,file="current.ipt",position="append")
-  !   Jloc=0d0
-  !   do ik=1,Lk
-  !      nkt  = dimag(Gk(ik)%less(itime,itime))
-  !      Jloc(:)  = Jloc(:) + Wtk(ik)*Nkt*Vkt(itime,ik,:)
-  !   enddo
-  !   write(unit,"(4F20.12)")params%t(itime),(Jloc(i),i=1,size(Jloc))
-  !   close(unit)
-  ! end subroutine neq_measure_current
+
+
+  !+-------------------------------------------------------------------+
+  !PURPOSE: measure current
+  !+-------------------------------------------------------------------+
+  subroutine measure_current(Gk,Vkt,Wtk,params)
+    type(kb_contour_gf)            :: gk(:)
+    real(8),dimension(:,:,:)       :: Vkt
+    real(8),dimension(:)           :: wtk
+    type(kb_contour_params)        :: params
+    integer                        :: unit,itime,Lk,ik,i
+    real(8),dimension(size(Vkt,3)) :: Jloc
+    real(8)                        :: nkt
+    !
+    Lk=size(gk)
+    itime = params%Nt
+    !
+    if(size(Vkt,1)<params%Ntime)stop "neq_measure_current: dim(Vkt,2) < Ntime"
+    if(size(Vkt,2)/=Lk)stop "neq_measure_current: dim(Vkt,3) != Lk"
+    !
+    unit = free_unit()
+    open(unit,file="current.info")
+    write(unit,"(8A20)")"time","Jx","Jy","Jz"
+    close(unit)
+    !
+    open(unit,file="current.ipt",position="append")
+    Jloc=0d0
+    do ik=1,Lk
+       nkt  = dimag(Gk(ik)%less(itime,itime))
+       Jloc = Jloc + Wtk(ik)*Nkt*Vkt(itime,ik,:)
+    enddo
+    write(unit,"(4F20.12)")params%t(itime),(Jloc(i),i=1,size(Jloc))
+    close(unit)
+  end subroutine measure_current
 
 
   !+-------------------------------------------------------------------+

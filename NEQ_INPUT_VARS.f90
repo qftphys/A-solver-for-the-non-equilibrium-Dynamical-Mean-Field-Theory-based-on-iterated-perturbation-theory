@@ -43,7 +43,7 @@ MODULE NEQ_VARS_GLOBAL
 
   !ELECTRIC FIELD VARIABLES (& NML):
   !=========================================================  
-  type(vect2D)            :: Ak,Ek         !Electric field vector potential and vector
+  !type(vect2D)            :: Ak,Ek         !Electric field vector potential and vector
   real(8)                 :: Efield        !Electric field strength
   real(8)                 :: Ex,Ey         !Electric field vectors as input
   real(8)                 :: t0,t1         !turn on/off time, t0 also center of the pulse

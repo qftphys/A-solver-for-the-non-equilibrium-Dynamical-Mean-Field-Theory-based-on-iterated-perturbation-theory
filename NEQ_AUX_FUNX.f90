@@ -19,6 +19,7 @@ module NEQ_AUX_FUNX
 contains
 
 
+  
 
   !+-------------------------------------------------------------------+
   !PURPOSE: obtain and continue the  equilibrium to Keldysh contour
@@ -104,19 +105,12 @@ contains
     ! call fft_sigma_tau2iw(Self%iw,Self%mats(0:),beta,Scoeff)
     ! ! call fftgf_tau2iw(Self%mats(0:),Self%iw,beta)
     ! Self%iw = xi*dimag(self%iw) !!ACTHUNG: imposing half-filling symmetry
-    ! if(Ui==0d0)Self%iw=zero
-    ! Self%less(1,1)=(xi**3)*U*U*g0%mats(L)*g0%mats(0)*g0%mats(L)
-    ! Self_gtr      =(xi**3)*U*U*g0%mats(0)*g0%mats(L)*g0%mats(0)
-    ! do j=0,L
-    !    Self%lmix(1,j)=(xi**3)*U*Ui*g0%mats(L-j)*g0%mats(j)*g0%mats(L-j)
-    ! end do
-    ! Self%ret(1,1) = Self_gtr - Self%less(1,1)
-    ! !
     do j=0,Lf
        stau(j) = Ui*Ui*ftau(j)*ftau(Lf-j)*ftau(j)
     end do
     call extract_gtau_(stau,Self%mats)
     call fft_gf_tau2iw(Self%iw,stau,beta)
+    if(Ui==0d0)Self%iw=zero
     Self%less(1,1)=(xi**3)*U*U*g0%mats(L)*g0%mats(0)*g0%mats(L)
     Self_gtr      =(xi**3)*U*U*g0%mats(0)*g0%mats(L)*g0%mats(0)
     do j=0,L
