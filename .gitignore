@@ -19,3 +19,5 @@ NEQ_IPT.o
 NEQ_MEASURE.o
 NEQ_THERMOSTAT.o
 revision.inc
+*.mod
+*.o

@@ -1,42 +1,27 @@
-FC=gfortran
-#PRECOMPILATION FLAG (leave blank for serial code)
-FPP=
+include make.inc
 
 #EXE=neqdmft_bethe_quench
-EXE=neqdmft_bethe_dos_quench
+#EXE=neqdmft_bethe_dos_quench
 #EXE=neqdmft_2dsquare_quench
-#EXE=neqdmft_2dsquare_field
-
-
+EXE=neqdmft_2dsquare_field
 
 DIR=./drivers
 DIREXE= $(HOME)/.bin
-.SUFFIXES: .f90
-
-#REVISION SOFTWARE GIT:
-BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
-VER = 'character(len=41),parameter :: revision = "$(REV)"' > revision.inc
 
 
-OBJS =  NEQ_CONTOUR.o NEQ_CONTOUR_GF.o NEQ_INPUT_VARS.o ELECTRIC_FIELD.o NEQ_THERMOSTAT.o NEQ_AUX_FUNX.o NEQ_MEASURE.o NEQ_IPT.o NEQ_DMFT_IPT.o
 
-#MKLARGS=-lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm
+OBJS =  NEQ_CONTOUR.o NEQ_CONTOUR_GF.o NEQ_INPUT_VARS.o ELECTRIC_FIELD.o NEQ_THERMOSTAT.o NEQ_EQUILIBRIUM.o  NEQ_MEASURE.o NEQ_IPT.o NEQ_DMFT_IPT.o
 
-INCARGS=-I/opt/scifor/gnu/include -I/opt/dmft_tools/gnu/include
-FFLAG +=-ffree-line-length-none $(INCARGS)
-
-#ARGS=-ldmftt -lscifor $(MKLARGS) -lminpack -larpack -lparpack 
-ARGS= -ldmftt -lscifor -lfftpack -llapack -lblas -lminpack -larpack -lparpack
 
 all:compile
 
 compile: version $(OBJS)
 	@echo " ..................... compile ........................... "
-	$(FC) $(FFLAG) $(OBJS) $(DIR)/$(EXE).f90 -o $(DIREXE)/$(EXE)_$(BRANCH) $(ARGS)
+	$(FC) $(FFLAG) $(OBJS) $(DIR)/$(EXE).f90 -o $(DIREXE)/$(EXE)$(BRANCH) $(ARGS)
 	@echo " ...................... done .............................. "
 	@echo ""
 	@echo ""
-	@echo "created" $(DIREXE)/$(EXE)_$(BRANCH)
+	@echo "created" $(DIREXE)/$(EXE)$(BRANCH)
 
 
 .f90.o:	

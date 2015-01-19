@@ -1,15 +1,16 @@
 MODULE NEQ_CONTOUR
-  USE CONSTANTS, only: one,xi,zero,pi
-  USE ARRAYS, only: linspace,arange
-  USE IOTOOLS, only: reg,free_unit
+  USE SF_CONSTANTS, only: one,xi,zero,pi
+  USE SF_ARRAYS, only: linspace,arange
+  USE SF_IOTOOLS, only: reg,free_unit
   implicit none
   private
 
   ! NON-EQ CONTOUR PARAMETERS
   !====================================================
   type,public                          :: kb_contour_params
-     integer                           :: Ntime=0,Ntau=0 !Largest dimension of the contour
-     integer                           :: Lf=0           !Number of Matsubara Frequencies
+     integer                           :: Ntime=0        !Largest dimension of the contour real-time part
+     integer                           :: Ntau=0         !Largest dimension of the contour imag-time part
+     integer                           :: Niw=0          !Number of Matsubara Frequencies
      integer                           :: Nt=0           !Actual time index
      real(8)                           :: dt=0.d0        !real-time step
      real(8)                           :: dtau=0.d0      !im-time step
@@ -41,30 +42,20 @@ contains
 
 
   !======= ALLOCATE ======= 
-  subroutine allocate_kb_contour_params(params,Ntime,Ntau,L)!,dt,beta)
+  subroutine allocate_kb_contour_params(params,Ntime,Ntau,Niw)
     type(kb_contour_params) :: params
-    integer,intent(in)      :: Ntime,Ntau
-    ! real(8),optional        :: dt,beta
-    integer,optional        :: L
+    integer,intent(in)      :: Ntime,Ntau,Niw
     if(allocated(params%t))deallocate(params%t)
     if(allocated(params%tau))deallocate(params%tau)
     if(allocated(params%wm))deallocate(params%wm)
     params%Ntime= Ntime
     params%Ntau = Ntau
+    params%Niw  = Niw
     params%Nt   = Ntime         !<== set the actual time_step to max_time
-    params%Lf   = 2048 ; if(present(L))params%Lf=L
     allocate(params%t(Ntime))
     allocate(params%tau(0:Ntau))
-    allocate(params%wm(params%Lf))
+    allocate(params%wm(params%Niw))
     params%status=.true.
-    ! if(present(dt))then
-    !    params%dt=dt
-    !    params%tmax=dt*real(Ntime-1,8)
-    ! endif
-    ! if(present(beta))then
-    !    params%beta=beta
-    !    params%dtau=beta/real(Ntau,8)
-    ! endif
   end subroutine allocate_kb_contour_params
 
 
@@ -93,7 +84,7 @@ contains
     if(.not.params%status)stop "neq_contour/set_kb_contour_params: Contour not allocated"
     Ntime          = params%Ntime
     Ntau           = params%Ntau
-    Niw            = params%Lf
+    Niw            = params%Niw
     params%Nt      = 1         !<== set the actual time_step to the minimum
     params%dt      = dt
     tmax_          = dt*(Ntime-1)
@@ -106,11 +97,9 @@ contains
     if(dt_/=params%dt)stop "neq_contour/set_kb_contour_params: dt != dt_ "
     if(dtau_/=params%dtau)stop "neq_contour/set_kb_contour_params: dtau != dtau_ "
     call print_kb_contour_params(params)
+    call write_kb_contour_params(params,"contour_info.neqipt")
   end subroutine setup_kb_contour_params
 
-  ! cc_params%t = linspace(0.d0,cc_params%tmax,cc_params%Ntime,mesh=dt)
-  !  cc_params%tau(0:) = linspace(0.d0,cc_params%beta,cc_params%Ntau+1,mesh=dtau)
-  !  cc_params%wm  = pi/cc_params%beta*dble(2*arange(1,cc_params%Lf)-1)
 
 
   !======= WRITE ======= 
@@ -123,7 +112,7 @@ contains
     open(unit,file=reg(file))
     write(unit,*)params%Ntime
     write(unit,*)params%Ntau
-    write(unit,*)params%Lf
+    write(unit,*)params%Niw
     write(unit,*)params%dt
     write(unit,*)params%beta
     write(unit,*)params%Nt
@@ -146,7 +135,7 @@ contains
     Ntau =params%Ntau
     write(*,"(A10,A1,I15)")"Ntime","=",params%Ntime
     write(*,"(A10,A1,I15)")"Ntau","=",params%Ntau
-    write(*,"(A10,A1,I15)")"Niw","=",params%Lf
+    write(*,"(A10,A1,I15)")"Niw","=",params%Niw
     write(*,"(A10,A1,I15)")"Nt ","=",params%Nt
     write(*,"(A10,A1,F15.8)")"time","=",params%time
     write(*,"(A10,A1,F15.8)")"dt","=",params%dt
@@ -198,37 +187,20 @@ contains
     type(kb_contour_params),intent(in)    :: P2
     if(.not.P2%status)stop "contour_gf/kb_contour_params_equality: P2 not allocated"
     if(P1%status)call deallocate_kb_contour_params(P1)
-    call allocate_kb_contour_params(P1,P2%Ntime,P2%Ntau)
+    call allocate_kb_contour_params(P1,P2%Ntime,P2%Ntau,P2%Niw)
     P1%Ntime  = P2%Ntime
     P1%Ntau   = P2%Ntau
+    P1%Niw    = P2%Niw
     P1%Nt     = P2%Nt
     P1%dt     = P2%dt
+    P1%beta   = P2%beta
     P1%dtau   = P2%dtau
     P1%time   = P2%time
+    P1%tmax   = P2%tmax
     P1%t(:)   = P2%t(:)
     P1%tau(0:)= P2%tau(0:)
     P1%wm(:)  = P2%wm(:)
   end subroutine kb_contour_params_equality
-
-  ! subroutine kb_contour_params_equality(P1,P2)
-  !   type(kb_contour_params),intent(inout) :: P1
-  !   type(kb_contour_params),intent(in)    :: P2
-  !   if(.not.P2%status)stop "neq_contour/kb_contour_params_equality: P2 not allocated"
-  !   if(P1%status)call deallocate_kb_contour_params(P1)
-  !   call allocate_kb_contour_params(P1,P2%Ntime,P2%Ntau,P2%Niw)
-  !   P1%Ntime  = P2%Ntime
-  !   P1%Ntau   = P2%Ntau
-  !   P1%Niw    = P2%Niw
-  !   P1%dt     = P2%dt
-  !   P1%beta   = P2%beta
-  !   P1%Itime  = P2%Itime
-  !   P1%time   = P2%time
-  !   P1%dtau   = P2%dtau
-  !   P1%tmax   = P2%tmax
-  !   P1%t(:)   = P2%t(:)
-  !   P1%tau(:) = P2%tau(:)
-  !   P1%wm(:)  = P2%wm(:)
-  ! end subroutine kb_contour_params_equality
 
 
 END MODULE NEQ_CONTOUR

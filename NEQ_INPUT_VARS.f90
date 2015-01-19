@@ -2,23 +2,19 @@
 !     PURPOSE  : Defines the global variables used thru all the code
 !     AUTHORS  : Adriano Amaricci
 !#####################################################################
-MODULE NEQ_VARS_GLOBAL
+MODULE NEQ_INPUT_VARS
   USE SCIFOR_VERSION
-  USE CONSTANTS
-  USE PARSE_INPUT
-  USE VECTORS
-  !
-  USE NEQ_CONTOUR
+  USE SF_CONSTANTS
+  USE DMFT_PARSE_INPUT
   implicit none
 
   !GIT VERSION
   include "revision.inc"
 
-  !Gloabl  variables
-  !=========================================================
+  !GLOABL  VARIABLES:
   integer                 :: Ntime         !Number of Time steps
   integer                 :: Ntau          !Imaginary time slices
-  integer                 :: Lfreq           !Number of frequencies
+  integer                 :: Niw           !Number of frequencies
   real(8)                 :: dt            !real-time step
   real(8)                 :: dtau          !imag-time step
   real(8)                 :: beta          !inverse temperature
@@ -38,29 +34,17 @@ MODULE NEQ_VARS_GLOBAL
   integer                 :: Nsuccess      !number of convergence success
   character(len=32)       :: g0file,sigfile
 
-
-
-
-  !ELECTRIC FIELD VARIABLES (& NML):
-  !=========================================================  
-  !type(vect2D)            :: Ak,Ek         !Electric field vector potential and vector
+  !ELECTRIC FIELD VARIABLES:
   real(8)                 :: Efield        !Electric field strength
-  real(8)                 :: Ex,Ey         !Electric field vectors as input
-  real(8)                 :: t0,t1         !turn on/off time, t0 also center of the pulse
+  real(8),dimension(3)    :: Evect         !Electric field vectors as input
+  real(8)                 :: Ton,Toff      !turn on/off time, t0 also center of the pulse
   integer                 :: Ncycles       !Number of cycles in pulsed light packet
   real(8)                 :: omega0        !parameter for the Oscilatting field and Pulsed light
   real(8)                 :: E1            !Electric field strenght for the AC+DC case (tune to resonate)
 
 
-
-  !CONTAINER FOR THE CONTOUR PARAMETERS 
-  !=========================================================  
-  type(kb_contour_params) :: cc_params 
-
-
-
-
 contains
+
 
   !+----------------------------------------------------------------+
   !PROGRAM  : READinput
@@ -73,11 +57,11 @@ contains
     !GLOBAL
     call parse_input_variable(Ntime      , "NTIME" , inputFILE , default      =100 , comment="Number of Real-Time steps")
     call parse_input_variable(Ntau       , "NTAU" , inputFILE , default       =50 , comment="Number of Imag-Time steps")
-    call parse_input_variable(Lfreq      , "Lfreq" , inputFILE , default        =2048 , comment="Number of Matsubara Frequencies")
+    call parse_input_variable(Niw        , "NIW" , inputFILE , default      =4096 , comment="Number of Matsubara Frequencies")
     call parse_input_variable(dt         , "DT" , inputFILE , default         =0.1d0 , comment="Real-time step")
     call parse_input_variable(beta       , "BETA" , inputFILE , default       =10d0 , comment="Inverse temperature")
     call parse_input_variable(Ui         , "Ui" , inputFILE , default         =0d0 , comment="equilibrium local interaction")
-    call parse_input_variable(U          , "U" , inputFILE , default       =1d0 , comment="non-equilibrium local interaction")
+    call parse_input_variable(U          , "U" , inputFILE , default          =1d0 , comment="non-equilibrium local interaction")
     call parse_input_variable(xmu        , "XMU" , inputFILE , default        =0.d0 , comment="chemical potential")
     call parse_input_variable(eps        , "EPS" , inputFILE , default        =0.01d0 , comment="broadening")
     call parse_input_variable(nloop      , "NLOOP" , inputFILE , default      =30 , comment="Max number of DMFT loop")
@@ -93,10 +77,9 @@ contains
     !EFIELD
     call parse_input_variable(field_type , "FIELD_TYPE" , inputFILE , default ='dc' , comment="profile type of the electric field ")
     call parse_input_variable(Efield     , "EFIELD" , inputFILE , default     =0d0 , comment="electric field strength")
-    call parse_input_variable(Ex         , "Ex" , inputFILE , default     =1d0 , comment="electric field direction (normalized)")
-    call parse_input_variable(Ey         , "Ey" , inputFILE , default     =0d0 , comment="electric field direction (normalized)")
-    call parse_input_variable(t0         , "T0" , inputFILE , default         =0d0 , comment="turn on time or center of the pulse")
-    call parse_input_variable(t1         , "T1" , inputFILE , default         =10000d0 , comment="turn off time")
+    call parse_input_variable(Evect      , "EVECT" , inputFILE , default      =[1d0,0d0,0d0] , comment="electric field direction (normalized)")
+    call parse_input_variable(ton        , "TON" , inputFILE , default        =0d0 , comment="turn on time or center of the pulse")
+    call parse_input_variable(toff       , "TOFF" , inputFILE , default       =10000d0 , comment="turn off time")
     call parse_input_variable(ncycles    , "NCYCLES" , inputFILE , default    =1 , comment="number of cycles in pulsed light signal ")
     call parse_input_variable(omega0     , "OMEGA0" , inputFILE , default     =acos(-1d0) , comment="parameter for the Oscilatting field and Pulsed light")
     call parse_input_variable(E1         , "E1" , inputFILE , default         =0d0 , comment="Electric field strenght for the AC+DC case (tune to resonate)")
@@ -112,5 +95,5 @@ contains
 
 
 
-end module NEQ_VARS_GLOBAL
+end module NEQ_INPUT_VARS
 
