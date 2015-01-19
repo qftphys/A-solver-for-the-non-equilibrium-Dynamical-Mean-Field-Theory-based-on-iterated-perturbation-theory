@@ -1,7 +1,7 @@
 module NEQ_IPT
   USE NEQ_CONTOUR
   USE NEQ_CONTOUR_GF
-  USE NEQ_VARS_GLOBAL
+  USE NEQ_INPUT_VARS
   implicit none
   private
 

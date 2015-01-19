@@ -31,26 +31,10 @@ program neqDMFT
   call parse_input_variable(Lk,"Lk",finput,default=100,comment="Number of energy levels for Bethe DOS")
   call read_input_init(trim(finput))
 
-
   !BUILD TIME GRIDS AND NEQ-PARAMETERS:
   !=====================================================================
-  call allocate_kb_contour_params(cc_params,Ntime,Ntau,Lfreq)
+  call allocate_kb_contour_params(cc_params,Ntime,Ntau,Niw)
   call setup_kb_contour_params(cc_params,dt,beta)
-  ! !BUILD TIME GRIDS AND NEQ-PARAMETERS:
-  ! !=====================================================================
-  ! call allocate_kb_contour_params(cc_params,Ntime,Ntau,Lfreq,dt,beta)
-  ! cc_params%t = linspace(0.d0,cc_params%tmax,cc_params%Ntime,mesh=dt)
-  ! cc_params%tau(0:) = linspace(0.d0,cc_params%beta,cc_params%Ntau+1,mesh=dtau)
-  ! cc_params%wm  = pi/cc_params%beta*dble(2*arange(1,cc_params%Lf)-1)
-  ! print*,"dt=",dt,cc_params%dt
-  ! print*,"dtau=",dtau,cc_params%dtau
-
-
-
-  ! !SET THE THERMOSTAT FUNCTION (in neq_thermostat):
-  ! !=====================================================================
-  ! call allocate_kb_contour_gf(Sbath,cc_params)
-  ! call get_thermostat_bath(Sbath,cc_params)
 
 
   !ALLOCATE ALL THE FUNCTIONS INVOLVED IN THE CALCULATION:
@@ -79,8 +63,7 @@ program neqDMFT
      print*,""
      print*,"time step=",itime
      cc_params%Nt=itime
-     !
-     call neq_setup_weiss_field(Gwf,cc_params)
+     call extrapolate_kb_contour_gf(Gwf,cc_params)
      dGwf_old = dGwf
      !
      iloop=0;converged=.false.
@@ -112,8 +95,6 @@ program neqDMFT
   enddo
 
 
-
-
   print*,"Getting n(e,t):"
   allocate(Hk(Lk),Wtk(Lk))
   allocate(nk(cc_params%Ntime,Lk))
@@ -129,10 +110,10 @@ program neqDMFT
      enddo
      forall(itime=1:cc_params%Ntime)nk(itime,ik)=dimag(Gwf%less(itime,itime))
   enddo
-  call splot3d("nkVSepsikVStime.ipt",cc_params%t,Hk,nk,wlines=.true.)
-  call plot_kb_contour_gf("Sigma.ipt",Sigma,cc_params)
-  call plot_kb_contour_gf("Gloc.ipt",Gloc,cc_params)
-  call plot_kb_contour_gf("G0.ipt",Gwf,cc_params)
+  call splot3d("nkVSepsikVStime.nipt",cc_params%t,Hk,nk,wlines=.true.)
+  call plot_kb_contour_gf("Sigma.nipt",Sigma,cc_params)
+  call plot_kb_contour_gf("Gloc.nipt",Gloc,cc_params)
+  call plot_kb_contour_gf("G0.nipt",Gwf,cc_params)
 
   print*,"BRAVO"
 

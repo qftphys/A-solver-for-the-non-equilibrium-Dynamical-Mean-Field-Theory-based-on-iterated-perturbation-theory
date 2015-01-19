@@ -33,6 +33,12 @@ program neqDMFT
   call read_input_init(trim(finput))
 
 
+  !BUILD TIME GRIDS AND NEQ-PARAMETERS:
+  !=====================================================================
+  call allocate_kb_contour_params(cc_params,Ntime,Ntau,Niw)
+  call setup_kb_contour_params(cc_params,dt,beta)
+
+
   !BUILD THE LATTICE STRUCTURE (in lib/square_lattice):
   allocate(epsik(Lk),wt(Lk))
   epsik = linspace(-wband,wband,Lk,mesh=de)
@@ -42,18 +48,6 @@ program neqDMFT
   call splot("DOSbethe.ipt",epsik,wt)
   wt=wt/sum(wt)
 
-
-  !BUILD TIME GRIDS AND NEQ-PARAMETERS:
-  !=====================================================================
-  call allocate_kb_contour_params(cc_params,Ntime,Ntau,Lfreq)
-  call setup_kb_contour_params(cc_params,dt,beta)
-  ! !BUILD TIME GRIDS AND NEQ-PARAMETERS:
-  ! call allocate_kb_contour_params(cc_params,Ntime,Ntau,Lfreq)!dt,beta,Lfreq)
-  ! cc_params%t = linspace(0.d0,cc_params%tmax,cc_params%Ntime,mesh=dt)
-  ! cc_params%tau(0:) = linspace(0.d0,cc_params%beta,cc_params%Ntau+1,mesh=dtau)
-  ! cc_params%wm  = pi/cc_params%beta*dble(2*arange(1,cc_params%Lf)-1)
-  ! print*,"dt=",cc_params%dt
-  ! print*,"dtau=",cc_params%dtau
 
 
   !ALLOCATE ALL THE FUNCTIONS INVOLVED IN THE CALCULATION:
@@ -80,7 +74,6 @@ program neqDMFT
   cc_params%Nt=1
   Gloc = zero
   call neq_continue_equilibirum(Gwf,Gk,dGk,Gloc,Sigma,epsik,wt,cc_params)
-  ! call init_equilibrium_functions(Gwf,Gk,dGk,Gloc,Sigma,cc_params)
   call measure_observables(Gloc,Sigma,cc_params)
   do ik=1,Lk
      nk(1,ik)=dimag(Gk(ik)%less(1,1))
@@ -100,7 +93,7 @@ program neqDMFT
      print*,"time step=",itime
      cc_params%Nt=itime
      !prepare the weiss-field at this actual time_step for DMFT:
-     call neq_setup_weiss_field(Gwf,cc_params)
+     call  extrapolate_kb_contour_gf(Gwf,cc_params)
      do ik=1,Lk
         dGk_old(ik) = dGk(ik)
      enddo
@@ -116,9 +109,7 @@ program neqDMFT
         call neq_solve_ipt(Gwf,Sigma,cc_params)
 
         !PERFORM THE SELF_CONSISTENCY: get local GF + update Weiss-Field
-        Gedge%ret(1:itime)=zero
-        Gedge%less(1:itime)=zero
-        Gedge%lmix(0:)=zero
+        Gedge=zero
         do ik=1,Lk
            call vide_kb_contour_gf(Ham(:,ik),Sigma,Gk(ik),dGk_old(ik),dGk(ik),cc_params)
            Gedge%ret(1:itime) = Gedge%ret(1:itime)  + wt(ik)*Gk(ik)%ret(itime,1:itime)
@@ -149,10 +140,10 @@ program neqDMFT
 
 
   !EVALUATE AND PRINT OTHER RESULTS OF THE CALCULATION
-  call splot3d("nkVSepsikVStime.ipt",cc_params%t,epsik,nk)
-  call plot_kb_contour_gf("Sigma.ipt",Sigma,cc_params)
-  call plot_kb_contour_gf("Gloc.ipt",Gloc,cc_params)
-  call plot_kb_contour_gf("G0.ipt",Gwf,cc_params)
+  call splot3d("nkVSepsikVStime.nipt",cc_params%t,epsik,nk)
+  call plot_kb_contour_gf("Sigma.nipt",Sigma,cc_params)
+  call plot_kb_contour_gf("Gloc.nipt",Gloc,cc_params)
+  call plot_kb_contour_gf("G0.nipt",Gwf,cc_params)
   print*,"BRAVO"
 
 
