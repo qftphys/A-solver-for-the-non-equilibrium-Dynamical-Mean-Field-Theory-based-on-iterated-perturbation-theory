@@ -3,12 +3,12 @@
 !     AUTHORS  : Adriano Amaricci
 !###############################################################
 module NEQ_THERMOSTAT
-  USE NEQ_VARS_GLOBAL
+  USE NEQ_INPUT_VARS
   USE NEQ_CONTOUR
   USE NEQ_CONTOUR_GF
-  USE ARRAYS
-  USE FUNCTIONS
-  USE IOTOOLS
+  USE SF_ARRAYS
+  USE SF_SPECIAL
+  USE SF_IOTOOLS
   implicit none
   private
   real(8),allocatable,dimension(:) :: bath_dens,wfreq
@@ -36,10 +36,11 @@ contains
     if(.not.S0%status)stop "thermostat/get_thermostat_bath: S0 not allocated. "
     N = params%Ntime      !<== work with the MAX size of the contour
     L = params%Ntau
-    
+
     write(*,"(A)")"Bath coupling is:"//txtfy(Vbath)
     Vhopping=sqrt(Vbath*2.d0*Wbath)
     write(*,"(A)")"Bath hopping, width are:"//reg(txtfy(Vhopping))//","//reg(txtfy(2.d0*Wbath))
+    write(*,"(A)")"Bath levels are:"//txtfy(Lbath)
 
     allocate(bath_dens(Lbath),wfreq(Lbath))
     wmax  = Wbath
@@ -60,7 +61,7 @@ contains
     case default
        stop "Bath type: not supported."
     end select
-    call splot("DOSbath.plot",wfreq,bath_dens,append=.true.)
+    call splot("DOSbath.nipt",wfreq,bath_dens,append=.true.)
 
 
     !Bath self-energies:
@@ -106,7 +107,7 @@ contains
     !Ret component:
     S0%ret = S0gtr-S0%less
     forall(i=1:params%Ntime,j=1:params%Ntime,i<j)S0%less(i,j)=-conjg(S0%less(j,i))
-    call plot_kb_contour_gf("Sbath.ipt",S0,params)
+    call plot_kb_contour_gf("Sbath.nipt",S0,params)
   end subroutine get_thermostat_bath
 
 
@@ -161,14 +162,6 @@ contains
     complex(8) :: gf,zeta
     bath_dens = exp(-0.5d0*(wfreq/Wbath)**2)/(sqrt(pi2)*Wbath) !standard Gaussian
     !bath_dens = exp(-((wfreq)/Wbath)**2)/(sqrt(pi)*Wbath) !Camille's choice
-    !    !!w/ erf in frquency space: coded from Abramowitz-Stegun
-    ! do i=-L,L
-    !    !w=wfreq(i)
-    !    !zeta=cmplx(w,eps,8)
-    !    !sig=aimag(zeta)/abs(dimag(zeta))
-    !    !gf=-sig*xi*sqrt(pi)*wfun(zeta/Wbath)/Wbath
-    !    !bath_dens(i)=-aimag(gf)/pi
-    ! enddo
   end subroutine get_bath_gaussian_dos
 
   subroutine get_bath_bethe_dos()
@@ -179,15 +172,10 @@ contains
        w=wfreq(i)
        zeta=cmplx(w,eps,8)
        gf=gfbether(w,zeta,wbath/2.d0)
-       bath_dens(i)=-aimag(gf)/pi
+       bath_dens(i)=-dimag(gf)/pi
     enddo
   end subroutine get_bath_bethe_dos
 
-
-
-  !********************************************************************
-  !********************************************************************
-  !********************************************************************
 
 
 

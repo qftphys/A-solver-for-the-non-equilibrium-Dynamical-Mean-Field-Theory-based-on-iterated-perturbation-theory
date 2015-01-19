@@ -30,12 +30,12 @@ program neqDMFT
 
 
   !BUILD TIME GRIDS AND NEQ-PARAMETERS:
-  call allocate_kb_contour_params(cc_params,Ntime,Ntau,Lfreq)
+  call allocate_kb_contour_params(cc_params,Ntime,Ntau,Niw)
   call setup_kb_contour_params(cc_params,dt,beta)
-
 
   !SET THE ELECTRIC FIELD (in electric_field):
   call set_efield_vector(cc_params%t)
+
 
   !BUILD THE LATTICE STRUCTURE (use tight_binding):
   Lk = Nx*Nx
@@ -58,7 +58,6 @@ program neqDMFT
         Vk(i,ik,:) = vk_model([kx,ky],cc_params%t(i))
      enddo
   enddo
-
 
 
   !SET THE THERMOSTAT FUNCTION (in neq_thermostat):
@@ -89,7 +88,7 @@ program neqDMFT
   cc_params%Nt=1
   Gloc = zero
   call neq_continue_equilibirum(Gwf,Gk,dGk,Gloc,Sigma,epsik,wt,cc_params)
-  call measure_observables(Gloc,Sigma,cc_params)
+  call measure_observables(Gloc,Sigma,cc_params,Gk,Hk,Wt)
   call measure_current(Gk,Vk,Wt,cc_params)
   do ik=1,Lk
      nk(1,ik)=dimag(Gk(ik)%less(1,1))
@@ -103,7 +102,7 @@ program neqDMFT
      print*,"time step=",itime
      cc_params%Nt=itime
      !prepare the weiss-field at this actual time_step for DMFT:
-     call neq_setup_weiss_field(Gwf,cc_params)
+     call extrapolate_kb_contour_gf(Gwf,cc_params)
      do ik=1,Lk
         dGk_old(ik) = dGk(ik)
      enddo
@@ -143,9 +142,8 @@ program neqDMFT
      enddo
 
      !EVALUATE AND PRINT THE RESULTS OF THE CALCULATION
-     call measure_observables(Gloc,Sigma,cc_params)
+     call measure_observables(Gloc,Sigma,cc_params,Gk,Hk,Wt)
      call measure_current(Gk,Vk,Wt,cc_params)
-     !call measure_current(Gk(:),cc_params)
      forall(ik=1:Lk)nk(itime,ik)=dimag(Gk(ik)%less(itime,itime))
   enddo
 
@@ -159,11 +157,11 @@ program neqDMFT
         nDens(ix,iy,i)=nk(i,ik)
      enddo
   enddo
-  call splot3d("3dFSVSpiVSt.ipt",kxgrid,kygrid,nDens(:,:,:))
-  call splot3d("nkVSepsikVStime.ipt",cc_params%t,epsik,nk)
-  call plot_kb_contour_gf("Sigma.ipt",Sigma,cc_params)
-  call plot_kb_contour_gf("Gloc.ipt",Gloc,cc_params)
-  call plot_kb_contour_gf("G0.ipt",Gwf,cc_params)
+  call splot3d("3dFSVSpiVSt.nipt",kxgrid,kygrid,nDens(:,:,:))
+  call splot3d("nkVSepsikVStime.nipt",cc_params%t,epsik,nk)
+  call plot_kb_contour_gf("Sigma.nipt",Sigma,cc_params)
+  call plot_kb_contour_gf("Gloc.nipt",Gloc,cc_params)
+  call plot_kb_contour_gf("G0.nipt",Gwf,cc_params)
 
 
   print*,"BRAVO"
