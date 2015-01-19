@@ -1,26 +1,24 @@
 MODULE NEQ_CONTOUR_GF
   USE NEQ_CONTOUR
-  !SCIFOR
-  USE CONSTANTS, only: one,xi,zero,pi
-  USE ARRAYS, only: linspace,arange
-  USE IOTOOLS, only: reg,free_unit,splot,splot3d,read_data,store_data
-  USE FUNCTIONS
+  USE SF_CONSTANTS, only: one,xi,zero,pi
+  USE SF_IOTOOLS
+  !USE SF_SPECIAL
   implicit none
   private
-
 
   ! KADANOFF-BAYM CONTOUR GREEN'S FUNCTIONS:
   !====================================================
   type,public                          :: kb_contour_gf
-     complex(8),dimension(:,:),allocatable :: less
-     complex(8),dimension(:,:),allocatable :: ret
-     complex(8),dimension(:,:),allocatable :: lmix
-     real(8),dimension(:),allocatable      :: mats
-     complex(8),dimension(:),allocatable   :: iw
-     logical                               :: status=.false.
-     integer                               :: N=0
-     integer                               :: L=0
-     integer                               :: LF=0
+     complex(8),dimension(:,:),pointer :: less
+     complex(8),dimension(:,:),pointer :: ret
+     complex(8),dimension(:,:),pointer :: lmix
+     real(8),dimension(:),pointer      :: mats
+     real(8),dimension(:),pointer      :: tau
+     complex(8),dimension(:),pointer   :: iw
+     logical                           :: status=.false.
+     integer                           :: N=0
+     integer                           :: L=0
+     integer                           :: LF=0
   end type kb_contour_gf
 
 
@@ -76,28 +74,27 @@ MODULE NEQ_CONTOUR_GF
   !
   public :: add_kb_contour_gf
   public :: convolute_kb_contour_gf
-  public :: vie_kb_contour_gf
-  public :: vide_kb_contour_gf
-  !
-  public :: gtr_kb_contour_gf
-  public :: rmix_kb_contour_gf
+  public :: extrapolate_kb_contour_gf
   public :: save_kb_contour_gf
   public :: inquire_kb_contour_gf
   public :: read_kb_contour_gf
   public :: plot_kb_contour_gf
   public :: check_dimension_kb_contour
   !
+  !VIE/VIDE SOLVER:
+  public :: vie_kb_contour_gf
+  public :: vide_kb_contour_gf
+  !
+  !INTEGRATION ROUTINES:
   public :: kb_trapz,kb_half_trapz
   ! 
+  !OVERLOAD OPERATORS
   public :: operator(*)
   public :: assignment(=)
 
 
 
-
 contains
-
-
 
 
 
@@ -118,8 +115,9 @@ contains
     G%Lf= Lf
     Allocate(G%less(N,N))  ; G%less=zero
     allocate(G%ret(N,N))   ; G%ret=zero
-    allocate(G%lmix(N,L))  ; G%lmix=zero
-    allocate(G%mats(L))    ; G%mats=0d0
+    allocate(G%lmix(N,0:L)); G%lmix=zero
+    allocate(G%mats(0:L))  ; G%mats=0.d0
+    allocate(G%tau(0:Lf))  ; G%tau=0.d0
     allocate(G%iw(Lf))     ; G%iw=zero
     G%status=.true.
   end subroutine allocate_kb_contour_gf
@@ -152,8 +150,8 @@ contains
   !======= DEALLOCATE ======= 
   subroutine deallocate_kb_contour_gf(G)
     type(kb_contour_gf) :: G
-    if(.not.G%status)stop "neq_contour_gf/deallocate_kb_contour_gf: G not allocated"
-    deallocate(G%less,G%ret,G%lmix,G%mats,G%iw)
+    if(.not.G%status)stop "contour_gf/deallocate_kb_contour_gf: G not allocated"
+    deallocate(G%less,G%ret,G%lmix,G%mats,G%tau,G%iw)
     G%N=0
     G%L=0
     G%Lf=0
@@ -169,37 +167,6 @@ contains
     dG%L=0
     dG%status=.false.
   end subroutine deallocate_kb_contour_dgf
-
-
-
-
-
-
-
-
-  !======= GET OTHER COMPONENTS ======= 
-  function gtr_kb_contour_gf(G,N) result(Ggtr)
-    type(kb_contour_gf)       :: G
-    integer                   :: N
-    complex(8),dimension(N,N) :: Ggtr
-    integer                   :: i,j
-    Ggtr = zero
-    forall(i=1:N,j=1:N,i>=j)Ggtr(i,j) = G%less(i,j) + G%ret(i,j)
-    forall(i=1:N,j=1:N,i<j)Ggtr(i,j)=-conjg(Ggtr(j,i))
-  end function gtr_kb_contour_gf
-
-  function rmix_kb_contour_gf(G,N,L) result(Grmix)
-    type(kb_contour_gf)       :: G
-    integer                   :: N,L
-    complex(8),dimension(L,N) :: Grmix
-    integer                   :: itau,j
-    Grmix = zero
-    forall(itau=1:L,j=1:N)Grmix(itau,j) = conjg(G%lmix(j,L-itau+1))
-  end function rmix_kb_contour_gf
-
-
-
-
 
 
 
@@ -286,15 +253,16 @@ contains
     integer             :: unit
     if(.not.G%status)stop "neq_contour_gf/save_kb_contour_gf: G not allocated"
     unit = free_unit()
-    open(unit,file=reg(file)//"_dimension.data")
+    open(unit,file=reg(file)//"_dimension.data.nipt")
     write(unit,"(A1,3A4,3X)")"#","N","L","Lf"
     write(unit,"(1X,3I4,3X)")G%N,G%L,G%Lf
     close(unit)
-    call store_data(reg(file)//"_less.data",G%less(:,:))
-    call store_data(reg(file)//"_ret.data", G%ret(:,:))
-    call store_data(reg(file)//"_lmix.data",G%lmix(:,:))
-    call store_data(reg(file)//"_mats.data",G%mats(:))
-    call store_data(reg(file)//"_iw.data",G%iw(:))
+    call store_data(reg(file)//"_less.data.nipt",G%less(:,:))
+    call store_data(reg(file)//"_ret.data.nipt", G%ret(:,:))
+    call store_data(reg(file)//"_lmix.data.nipt",G%lmix(:,0:))
+    call store_data(reg(file)//"_mats.data.nipt",G%mats(0:))
+    call store_data(reg(file)//"_tau.data.nipt",G%tau(0:))
+    call store_data(reg(file)//"_iw.data.nipt",G%iw(:))
   end subroutine save_kb_contour_gf
   !
   subroutine save_kb_contour_dgf(dG,file)
@@ -303,13 +271,13 @@ contains
     integer :: unit
     if(.not.dG%status)stop "neq_contour_gf/save_kb_contour_dgf: dG not allocated"
     unit = free_unit()
-    open(unit,file=reg(file)//"_dimension.data")
+    open(unit,file=reg(file)//"_dimension.data.nipt")
     write(unit,"(A1,2A4,2X)")"#","N","L"
     write(unit,"(1X,2I4,2X)")dG%N,dG%L
     close(unit)
-    call store_data(reg(file)//"_less.data",dG%less(:))
-    call store_data(reg(file)//"_ret.data", dG%ret(:))
-    call store_data(reg(file)//"_lmix.data",dG%lmix(:))
+    call store_data(reg(file)//"_less.data.nipt",dG%less(:))
+    call store_data(reg(file)//"_ret.data.nipt", dG%ret(:))
+    call store_data(reg(file)//"_lmix.data.nipt",dG%lmix(0:))
   end subroutine save_kb_contour_dgf
 
 
@@ -326,12 +294,13 @@ contains
     character(len=*)     :: file
     logical              :: check
     check = inquire_kb_contour_gf(file)
-    if(.not.G%status.OR..not.check)stop "neq_contour_gf/read_kb_contour_gf: G not allocated"
-    call read_data(trim(file)//"_less.data",G%less(:,:))
-    call read_data(trim(file)//"_ret.data",G%ret(:,:))
-    call read_data(trim(file)//"_lmix.data",G%lmix(:,:))
-    call read_data(trim(file)//"_mats.data",G%mats(:))
-    call read_data(trim(file)//"_iw.data",G%iw(:))
+    if(.not.G%status.OR..not.check)stop "contour_gf/read_kb_contour_gf: G not allocated"
+    call read_data(trim(file)//"_less.data.nipt",G%less(:,:))
+    call read_data(trim(file)//"_ret.data.nipt",G%ret(:,:))
+    call read_data(trim(file)//"_lmix.data.nipt",G%lmix(:,0:))
+    call read_data(trim(file)//"_mats.data.nipt",G%mats(0:))
+    call read_data(trim(file)//"_tau.data.nipt",G%tau(0:))
+    call read_data(trim(file)//"_iw.data.nipt",G%iw(:))
   end subroutine read_kb_contour_gf
   !
   subroutine read_kb_contour_dgf(dG,file)
@@ -339,34 +308,34 @@ contains
     character(len=*)     :: file
     logical              :: check
     check = inquire_kb_contour_dgf(file)
-    if(.not.dG%status.OR..not.check)stop "neq_contour_gf/read_kb_contour_dgf: dG not allocated"
-    call read_data(trim(file)//"_less.data",dG%less(:))
-    call read_data(trim(file)//"_ret.data",dG%ret(:))
-    call read_data(trim(file)//"_lmix.data",dG%lmix(:))
+    if(.not.dG%status.OR..not.check)stop "contour_gf/read_kb_contour_dgf: dG not allocated"
+    call read_data(trim(file)//"_less.data.nipt",dG%less(:))
+    call read_data(trim(file)//"_ret.data.nipt",dG%ret(:))
+    call read_data(trim(file)//"_lmix.data.nipt",dG%lmix(0:))
   end subroutine read_kb_contour_dgf
   !
   function inquire_kb_contour_gf(file) result(check)
-    integer                :: i
-    logical                :: check,bool(5)
-    character(len=*)       :: file
-    character,dimension(5) :: ctype=([character(len=5) :: 'less','ret','lmix','mats','iw'])
+    integer          :: i
+    logical          :: check,bool(5)
+    character(len=*) :: file
+    character(len=16),dimension(5)  :: ctype=([ character(len=5) :: 'less','ret','lmix','mats','iw'])
     check=.true.
     do i=1,5
-       inquire(file=reg(file)//"_"//reg(ctype(i))//".data",exist=bool(i))
-       if(.not.bool(i))inquire(file=reg(file)//"_"//reg(ctype(i))//".data.gz",exist=bool(i))
+       inquire(file=reg(file)//"_"//reg(ctype(i))//".data.nipt",exist=bool(i))
+       if(.not.bool(i))inquire(file=reg(file)//"_"//reg(ctype(i))//".data.nipt.gz",exist=bool(i))
        check=check.AND.bool(i)
     enddo
   end function inquire_kb_contour_gf
   !
   function inquire_kb_contour_dgf(file) result(check)
-    integer                :: i
-    logical                :: check,bool(3)
-    character(len=*)       :: file
-    character,dimension(3) :: ctype=([character(len=5) :: 'less','ret','lmix'])
+    integer          :: i
+    logical          :: check,bool(3)
+    character(len=*) :: file
+    character(len=16),dimension(3)  :: ctype=([character(len=5) :: 'less','ret','lmix'])
     check=.true.
     do i=1,3
-       inquire(file=reg(file)//"_"//reg(ctype(i))//".data",exist=bool(i))
-       if(.not.bool(i))inquire(file=reg(file)//"_"//reg(ctype(i))//".data.gz",exist=bool(i))
+       inquire(file=reg(file)//"_"//reg(ctype(i))//".data.nipt",exist=bool(i))
+       if(.not.bool(i))inquire(file=reg(file)//"_"//reg(ctype(i))//".data.nipt.gz",exist=bool(i))
        check=check.AND.bool(i)
     enddo
   end function inquire_kb_contour_dgf
@@ -380,14 +349,15 @@ contains
     character(len=*)        :: file
     type(kb_contour_gf)     :: G
     type(kb_contour_params) :: params
-    integer                 :: Nt
-    if(.not.G%status)stop "neq_contour_gf/plot_kb_contour_gf: G is not allocated" 
-    Nt=params%Itime
-    call splot3d(reg(file)//"_less_t_t",params%t(:Nt),params%t(:Nt),G%less(:Nt,:Nt))
-    call splot3d(reg(file)//"_ret_t_t",params%t(:Nt),params%t(:Nt),G%ret(:Nt,:Nt))
-    call splot3d(reg(file)//"_lmix_t_tau",params%t(:Nt),params%tau(:),G%lmix(:Nt,:))
-    call splot(reg(file)//"_mats_tau",params%tau(:),G%mats(:))
-    call splot(reg(file)//"_mats_iw",params%wm(:),G%iw(:))
+    integer                 :: Nt,i
+    if(.not.G%status)stop "contour_gf/plot_kb_contour_gf: G is not allocated" 
+    Nt=params%Ntime
+    call splot3d(reg(file)//"_less_t_t.data.nipt",params%t(:Nt),params%t(:Nt),G%less(:Nt,:Nt))
+    call splot3d(reg(file)//"_ret_t_t.data.nipt",params%t(:Nt),params%t(:Nt),G%ret(:Nt,:Nt))
+    call splot3d(reg(file)//"_lmix_t_tau.data.nipt",params%t(:Nt),params%tau(0:),G%lmix(:Nt,0:))
+    call splot(reg(file)//"_mats_tau.data.nipt",params%tau(0:),G%mats(0:))
+    call splot(reg(file)//"_tau_tau.data.nipt",(/(i*params%beta/params%Niw,i=0,params%Niw)/),G%mats(0:))
+    call splot(reg(file)//"_mats_iw.data.nipt",params%wm(:),G%iw(:))
   end subroutine plot_kb_contour_gf
   !
   subroutine plot_kb_contour_dgf(file,dG,params)
@@ -395,17 +365,117 @@ contains
     type(kb_contour_dgf)    :: dG
     type(kb_contour_params) :: params
     integer                 :: Nt
-    if(.not.dG%status)stop "neq_contour_gf/plot_kb_contour_gf: G is not allocated" 
-    Nt=params%Itime
-    call splot(reg(file)//"_less_t",params%t(:Nt),dG%less(:Nt))
-    call splot(reg(file)//"_ret_t",params%t(:Nt),dG%ret(:Nt))
-    call splot(reg(file)//"_lmix_tau",params%tau(:),dG%lmix(:))
+    if(.not.dG%status)stop "contour_gf/plot_kb_contour_gf: G is not allocated" 
+    Nt=params%Ntime
+    call splot(reg(file)//"_less_t.data.nipt",params%t(:Nt),dG%less(:Nt))
+    call splot(reg(file)//"_ret_t.data.nipt",params%t(:Nt),dG%ret(:Nt))
+    call splot(reg(file)//"_lmix_tau.data.nipt",params%tau(0:),dG%lmix(0:))
   end subroutine plot_kb_contour_dgf
 
 
 
 
 
+  !======= ADD ======= 
+  !C(t,t')=A(t,t') + B(t,t'), with t=t_max && t'=0,t_max
+  !t_max_index==N
+  !IF YOU WANT THIS TO BE OVERLOADED IN + OPERATOR
+  !C SHOULD BE ALLOCATED INSIDE THE FUNCTION ADD_KB...
+  !BECAUSE POINTERS IS THE RESULT OF FUNCTION ITSELF (C).
+  !ANYWAY THIS REQUIRE ONE TO CHECK ALL THE SIZES AND ALLOCATION
+  !I RATHER PREFER TO USE THIS ROUTINE NOW...
+  subroutine add_kb_contour_gf(A,B,C,params)
+    type(kb_contour_gf)     :: A,B,C
+    type(kb_contour_params) :: params
+    integer                 :: N,L
+    logical                 :: checkA,checkB,checkC
+    if(  (.not.A%status).OR.&
+         (.not.B%status).OR.&
+         (.not.C%status))stop "contour_gf/add_kb_contour_gf: A,B,C not allocated"
+    N   = params%Ntime
+    L   = params%Ntau
+    !
+    checkA=check_dimension_kb_contour(A,N,L) 
+    checkB=check_dimension_kb_contour(B,N,L)
+    checkC=check_dimension_kb_contour(C,N,L)
+    C%less(:,:) = A%less(:,:) + B%less(:,:)
+    C%ret(:,:)  = A%ret(:,:)  + B%ret(:,:)
+    C%lmix(:,0:)= A%lmix(:,0:)+ B%lmix(:,0:)
+    C%mats(0:)  = A%mats(0:)  + B%mats(0:)
+    C%tau(0:)   = A%tau(0:)   + B%tau(0:)
+    C%iw(0:)    = A%iw(0:)    + B%iw(0:)
+  end subroutine  add_kb_contour_gf
+
+  subroutine add_kb_contour_dgf(A,B,C,params)
+    type(kb_contour_dgf)    :: A,B,C
+    type(kb_contour_params) :: params
+    integer                 :: N,L
+    logical                 :: checkA,checkB,checkC
+    if(  (.not.A%status).OR.&
+         (.not.B%status).OR.&
+         (.not.C%status))stop "contour_gf/add_kb_contour_gf: A,B,C not allocated"
+    N   = params%Nt                 !<== work with the ACTUAL size of the contour
+    L   = params%Ntau
+    !
+    checkA=check_dimension_kb_contour(A,N,L)
+    checkB=check_dimension_kb_contour(B,N,L)
+    checkC=check_dimension_kb_contour(C,N,L)
+    C%less(:) = A%less(:) + B%less(:)
+    C%ret(:)  = A%ret(:)  + B%ret(:)  
+    C%lmix(0:)= A%lmix(0:)+ B%lmix(0:)
+  end subroutine add_kb_contour_dgf
+
+
+
+
+  !======= EXTRAPOLATION ======= 
+  !extrapolate a function from a given time
+  !to the next one:
+  subroutine extrapolate_kb_contour_gf(g,params)
+    type(kb_contour_gf)     :: g
+    type(kb_contour_params) :: params
+    integer                 :: i,j,k,N,L
+    if(.not.g%status)     stop "extrapolate_kb_contour_gf: g is not allocated"
+    if(.not.params%status)stop "extrapolate_kb_contour_gf: params is not allocated"
+    !
+    N = params%Nt
+    L = params%Ntau
+    !
+    select case(N)
+    case(1)
+       return
+    case(2)
+       !GUESS G AT THE NEXT STEP, GIVEN THE INITIAL CONDITIONS
+       do j=1,N
+          g%ret(N,j) =g%ret(1,1)
+          g%less(N,j)=g%less(1,1)
+       end do
+       do i=1,N-1
+          g%less(i,N)=g%less(1,1)
+       end do
+       do j=0,L
+          g%lmix(N,j)=g%lmix(1,j)
+       end do
+    case default
+       !EXTEND G FROM THE [N-1,N-1] TO THE [N,N] SQUARE TO START DMFT
+       !USING QUADRATIC EXTRAPOLATION
+       do k=1,N-1
+          g%less(N,k)=2.d0*g%less(N-1,k)-g%less(N-2,k)
+          g%less(k,N)=2.d0*g%less(k,N-1)-g%less(k,N-2)
+       end do
+       g%less(N,N)=2.d0*g%less(N-1,N-1)-g%less(N-2,N-2)
+       !
+       do k=0,L
+          g%lmix(N,k)=2.d0*g%lmix(N-1,k)-g%lmix(N-2,k)
+       end do
+       !
+       g%ret(N,N)=-xi
+       do k=1,N-2
+          g%ret(N,k)=2.d0*g%ret(N-1,k)-g%ret(N-2,k)
+       end do
+       g%ret(N,N-1)=0.5d0*(g%ret(N,N)+g%ret(N,N-2))
+    end select
+  end subroutine extrapolate_kb_contour_gf
 
 
 
@@ -443,86 +513,83 @@ contains
     !
     !Ret. component
     !C^R(t,t')=\int_{t'}^t ds A^R(t,s)*B^R(s,t')
-    !-------------------------------------------------------------------
     C%ret(N,1:N)=zero
-    do j=1,N
-       AxB  = zero
-       do k=j,N
+    do j=1,N       !for all t' in 0:t_max
+       AxB(0:)  = zero !AxB should be set to zero before integration
+       do k=j,N    !store the convolution between t'{=j} and t{=N}
           AxB(k) = A%ret(N,k)*B%ret(k,j)
        enddo
-       C%ret(n,j) = C%ret(n,j) + dt*kb_trapz(AxB,j,N)
+       C%ret(n,j) = C%ret(n,j) + dt*kb_trapz(AxB(0:),j,N)
     enddo
     !
     !Lmix. component
     !C^\lmix(t,tau')=\int_0^{beta} ds A^\lmix(t,s)*B^M(s,tau')
-    !               +\int_0^{t} ds A^R(t,s)*B^\lmix(s,tau')
+    !                  +\int_0^{t} ds A^R(t,s)*B^\lmix(s,tau')
     !               = I1 + I2
-    !-------------------------------------------------------------------
-    C%lmix(N,L)=zero
-    do jtau=1,L
+    C%lmix(N,0:L)=zero
+    do jtau=0,L
        !I1:
-       AxB = zero
-       do k=1,jtau
-          AxB(k)=A%lmix(N,k)*B%mats(k + L-jtau)
+       AxB(0:) = zero
+       !break the integral I1 in two parts to take care of the 
+       !sign of (tau-tau').
+       do k=0,jtau
+          AxB(k)=A%lmix(N,k)*B%mats(L+k-jtau)
        end do
-       C%lmix(N,jtau)=C%lmix(N,jtau) - dtau*kb_trapz(AxB,1,jtau)
+       C%lmix(N,jtau)=C%lmix(N,jtau)-dtau*kb_trapz(AxB(0:),0,jtau)
        do k=jtau,L
-          AxB(k)=A%lmix(N,k)*B%mats(k - jtau+1)
+          AxB(k)=A%lmix(N,k)*B%mats(k-jtau)
        end do
-       C%lmix(n,jtau)=C%lmix(n,jtau) + dtau*kb_trapz(AxB,jtau,L)
+       C%lmix(n,jtau)=C%lmix(n,jtau)+dtau*kb_trapz(AxB(0:),jtau,L)
        !
        !I2:
-       AxB = zero
+       AxB(0:) = zero
        do k=1,N
           AxB(k) = A%ret(N,k)*B%lmix(k,jtau)
        enddo
-       C%lmix(N,jtau) = C%lmix(N,jtau) + dt*kb_trapz(AxB,1,N)
+       C%lmix(N,jtau) = C%lmix(N,jtau) + dt*kb_trapz(AxB(0:),1,N)
     enddo
     !
     !Less component
     !C^<(t,t')=-i\int_0^{beta} ds A^\lmix(t,s)*B^\rmix(s,t')
-    !           +\int_0^{t'} ds A^<(t,s)*B^A(s,t')
-    !           +\int_0^{t} ds A^R(t,s)*B^<(s,t')
-    !         = I1 + I2 + I3
+    !             +\int_0^{t'} ds A^<(t,s)*B^A(s,t')
+    !             +\int_0^{t} ds A^R(t,s)*B^<(s,t')
     ! (t,t')=>(N,j) <==> Vertical side, no tip (j=1,N-1)
-    !-------------------------------------------------------------------
     do j=1,N-1
        C%less(N,j)=zero
-       !I1:
-       do k=1,L
-          AxB(k)=A%lmix(N,k)*conjg(B%lmix(j,L-k+1))
+       do k=0,L
+          AxB(k)=A%lmix(N,k)*conjg(B%lmix(j,L-k))
        end do
-       C%less(N,j)=C%less(N,j) - xi*dtau*kb_trapz(AxB,1,L)
-       !I2:
+       C%less(N,j)=C%less(N,j)-xi*dtau*kb_trapz(AxB(0:),0,L)
+       !
        do k=1,j
           AxB(k)=A%less(N,k)*conjg(B%ret(j,k))
        end do
-       C%less(N,j)=C%less(N,j) + dt*kb_trapz(AxB,1,j)
-       !I3:
+       C%less(N,j)=C%less(N,j)+dt*kb_trapz(AxB(0:),1,j)
+       !
        do k=1,N
           AxB(k)=A%ret(N,k)*B%less(k,j)
        end do
-       C%less(N,j)=C%less(N,j) + dt*kb_trapz(AxB,1,N)
+       C%less(N,j)=C%less(N,j)+dt*kb_trapz(AxB(0:),1,N)
     end do
+    !
     ! (t,t')=>(i,N) <==> Horizontal side, w/ tip (i=1,N)
     do i=1,N
        C%less(i,N)=zero
-       do k=1,L
-          AxB(k)=A%lmix(i,k)*conjg(B%lmix(n,L-k+1))
+       do k=0,L
+          AxB(k)=A%lmix(i,k)*conjg(B%lmix(n,L-k))
        end do
-       C%less(i,N)=C%less(i,N) - xi*dtau*kb_trapz(AxB,1,L)
+       C%less(i,N)=C%less(i,N)-xi*dtau*kb_trapz(AxB(0:),0,L)
        !
        do k=1,N
           AxB(k)=A%less(i,k)*conjg(B%ret(N,k))
        end do
-       C%less(i,N)=C%less(i,N) + dt*kb_trapz(AxB,1,N)
+       C%less(i,N)=C%less(i,N)+dt*kb_trapz(AxB(0:),1,N)
        !
        do k=1,i
           AxB(k)=A%ret(i,k)*B%less(k,N)
        end do
-       C%less(i,N)=C%less(i,N)+dt*kb_trapz(AxB,1,i)
+       C%less(i,N)=C%less(i,N)+dt*kb_trapz(AxB(0:),1,i)
     end do
-    deallocate(AxB)
     !    
     if(present(dcoeff))then
        C%lmix(N,L)     = dcoeff*C%lmix(N,L)
@@ -542,53 +609,6 @@ contains
 
 
 
-
-  !======= ADD ======= 
-  !C(t,t')=A(t,t') + B(t,t'), with t=t_max && t'=0,t_max
-  !t_max_index==N
-  !IF YOU WANT THIS TO BE OVERLOADED IN + OPERATOR
-  !C SHOULD BE ALLOCATED INSIDE THE FUNCTION ADD_KB...
-  !BECAUSE POINTERS IS THE RESULT OF FUNCTION ITSELF (C).
-  !ANYWAY THIS REQUIRE ONE TO CHECK ALL THE SIZES AND ALLOCATION
-  !I RATHER PREFER TO USE THIS ROUTINE NOW...
-  subroutine add_kb_contour_gf(A,B,C,params)
-    type(kb_contour_gf)     :: A,B,C
-    type(kb_contour_params) :: params
-    integer                 :: N,L
-    logical                 :: checkA,checkB,checkC
-    if(  (.not.A%status).OR.&
-         (.not.B%status).OR.&
-         (.not.C%status))stop "neq_contour_gf/add_kb_contour_gf: A,B,C not allocated"
-    N   = params%Ntime
-    L   = params%Ntau
-    !
-    checkA=check_dimension_kb_contour(A,N,L) 
-    checkB=check_dimension_kb_contour(B,N,L)
-    checkC=check_dimension_kb_contour(C,N,L)
-    C%less(:,:) = A%less(:,:) + B%less(:,:)
-    C%ret(:,:)  = A%ret(:,:)  + B%ret(:,:)
-    C%lmix(:,:) = A%lmix(:,:) + B%lmix(:,:)
-    C%mats(:)   = A%mats(:)   + B%mats(:)
-  end subroutine  add_kb_contour_gf
-
-  subroutine add_kb_contour_dgf(A,B,C,params)
-    type(kb_contour_dgf)    :: A,B,C
-    type(kb_contour_params) :: params
-    integer                 :: N,L
-    logical                 :: checkA,checkB,checkC
-    if(  (.not.A%status).OR.&
-         (.not.B%status).OR.&
-         (.not.C%status))stop "neq_contour_gf/add_kb_contour_gf: A,B,C not allocated"
-    N   = params%Itime                 !<== work with the ACTUAL size of the contour
-    L   = params%Ntau
-    !
-    checkA=check_dimension_kb_contour(A,N,L)
-    checkB=check_dimension_kb_contour(B,N,L)
-    checkC=check_dimension_kb_contour(C,N,L)
-    C%less(:) = A%less(:) + B%less(:)
-    C%ret(:)  = A%ret(:)  + B%ret(:)  
-    C%lmix(:) = A%lmix(:) + B%lmix(:)
-  end subroutine add_kb_contour_dgf
 
 
 
@@ -987,8 +1007,9 @@ contains
     complex(8),intent(in)             :: C
     G1%less(:,:)  = C
     G1%ret(:,:)   = C
-    G1%lmix(:,:)  = C
-    G1%mats(:)    = C
+    G1%lmix(:,0:) = C
+    G1%mats(0:)   = C
+    G1%tau(0:)    = C
     G1%iw(:)      = C
   end subroutine kb_contour_gf_equality_
   !
@@ -997,8 +1018,9 @@ contains
     type(kb_contour_gf),intent(in)    :: G2
     G1%less(:,:)  = G2%less(:,:)
     G1%ret(:,:)   = G2%ret(:,:)
-    G1%lmix(:,:)  = G2%lmix(:,:)
-    G1%mats(:)    = G2%mats(:)
+    G1%lmix(:,0:) = G2%lmix(:,0:)
+    G1%mats(0:)   = G2%mats(0:)
+    G1%tau(0:)    = G2%tau(0:)
     G1%iw(:)      = G2%iw(:)
   end subroutine kb_contour_gf_equality__
   !
@@ -1028,8 +1050,9 @@ contains
     type(kb_contour_gf)            :: F
     F%less(:,:) = C*G%less(:,:)
     F%ret(:,:)  = C*G%ret(:,:)
-    F%lmix(:,:) = C*G%lmix(:,:)
-    F%mats(:)   = C*G%mats(:)
+    F%lmix(:,0:)= C*G%lmix(:,0:)
+    F%mats(0:)  = C*G%mats(0:)
+    F%tau(0:)   = C*G%tau(0:)
     F%iw(:)     = C*G%iw(:)
   end function kb_contour_gf_scalarL_d
   !
@@ -1076,8 +1099,9 @@ contains
     type(kb_contour_gf)            :: F
     F%less(:,:) = G%less(:,:)*C
     F%ret(:,:)  = G%ret(:,:)*C
-    F%lmix(:,:) = G%lmix(:,:)*C
-    F%mats(:)   = G%mats(:)*C
+    F%lmix(:,0:)= G%lmix(:,0:)*C
+    F%mats(0:)  = G%mats(0:)*C
+    F%tau(0:)   = G%tau(0:)*C
     F%iw(:)     = G%iw(:)*C
   end function kb_contour_gf_scalarR_d
   !
@@ -1099,8 +1123,9 @@ contains
     type(kb_contour_gf)            :: F
     F%less(:,:) = G%less(:,:)*C
     F%ret(:,:)  = G%ret(:,:)*C
-    F%lmix(:,:) = G%lmix(:,:)*C
-    F%mats(:)   = G%mats(:)*C
+    F%lmix(:,0:)= G%lmix(:,0:)*C
+    F%mats(0:)  = G%mats(0:)*C
+    F%tau(0:)   = G%tau(0:)*C
     F%iw(:)     = G%iw(:)*C
   end function kb_contour_gf_scalarR_c
   !

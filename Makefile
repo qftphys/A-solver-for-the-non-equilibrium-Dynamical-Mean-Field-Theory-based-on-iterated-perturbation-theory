@@ -1,9 +1,8 @@
 #FC=gfortran
 #PRECOMPILATION FLAG (leave blank for serial code)
 FPP=
-#
 #EXE=neqdmft_bethe_quench
-EXE=neqdmft_bethe_dos
+EXE=neqdmft_bethe_dos_quench
 #EXE=neqdmft_2dsquare_quench
 #EXE=neqdmft_2dsquare_field
 
@@ -18,7 +17,7 @@ BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 VER = 'character(len=41),parameter :: revision = "$(REV)"' > revision.inc
 
 
-OBJS =  NEQ_CONTOUR.o NEQ_CONTOUR_GF.o NEQ_INPUT_VARS.o ELECTRIC_FIELD.o THERMOSTAT.o NEQ_IPT.o NEQ_AUX_FUNX.o NEQ_MEASURE.o NEQ_DMFT_IPT.o
+OBJS =  NEQ_CONTOUR.o NEQ_CONTOUR_GF.o NEQ_INPUT_VARS.o ELECTRIC_FIELD.o NEQ_THERMOSTAT.o NEQ_EQUILIBRIUM.o  NEQ_MEASURE.o NEQ_IPT.o NEQ_DMFT_IPT.o
 
 #GFORTRAN:
 # INCARGS=-I/opt/scifor/gnu/include -I/opt/dmft_tools/gnu/include

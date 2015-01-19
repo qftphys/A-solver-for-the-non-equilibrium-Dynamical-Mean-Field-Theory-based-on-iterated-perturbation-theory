@@ -1,12 +1,7 @@
-!###############################################################
-!     PURPOSE  : A non-equilibrium IPT solver module. 
-!###############################################################
 module NEQ_IPT
   USE NEQ_CONTOUR
   USE NEQ_CONTOUR_GF
   USE NEQ_INPUT_VARS
-  USE CONSTANTS
-  USE DMFT_TOOLS
   implicit none
   private
 
