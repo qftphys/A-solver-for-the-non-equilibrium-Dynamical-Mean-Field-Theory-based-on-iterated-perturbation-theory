@@ -1,10 +1,10 @@
-FC=ifort
-PLAT=intel
+FC=gfortran
+PLAT=gnu
 #PRECOMPILATION FLAG (leave blank for serial code)
 FPP=
 
 #set here the absolute bath to the DMFT_TOOLS and SCIFORTRAN libraries:
-LIBROOT=/opt
+LIBROOT=/scratch/fperonaci/opt
 
 .SUFFIXES: .f90
 
@@ -25,6 +25,7 @@ endif
 ARGS=  -ldmftt -lscifor -lfftpack -llapack -lblas
 
 #REVISION SOFTWARE GIT:
+REV=_$(shell git rev-parse HEAD)
 BRANCH=_$(shell git rev-parse --abbrev-ref HEAD)
 VER = 'character(len=41),parameter :: revision = "$(REV)"' > revision.inc
 
