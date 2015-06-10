@@ -11,7 +11,9 @@ module NEQ_EQUILIBRIUM
   private
 
   interface neq_continue_equilibirum
-     module procedure neq_continue_equilibirum_bethe,neq_continue_equilibirum_
+     module procedure neq_continue_equilibirum_bethe, &
+                      neq_continue_equilibirum_, &
+                      neq_continue_equilibirum__
   end interface neq_continue_equilibirum
 
   public  :: neq_continue_equilibirum     ! read G0 and continue the equilibrium GF,Sigma,G0 to the t=0 contour.
@@ -270,7 +272,8 @@ contains
     dGk%ret(1)  = -xi*Hk*Gk%ret(1,1)
     !get d/dt G_k^< = -i e(k,0)G_k^< -xi(-xi)int_0^beta S^\lmix*G_k^\rmix
     do k=0,L
-       SxG(k)=self%lmix(1,k)*conjg(Gk%lmix(1,L-k))
+!      SxG(k)=self%lmix(1,k)*conjg(Gk%lmix(1,L-k))
+       SxG(k)=self%lmix(1,k)*get_rmix(Gk,k,1,L)
     end do
     dGk%less(1) = -xi*Hk*Gk%less(1,1)-xi*(-xi)*params%dtau*kb_trapz(SxG(0:),0,L) 
     !get d/dt G_k^\lmix = -xi*e(k,0)*G_k^\lmix - xi*int_0^beta G_k^\lmix*G_k^M
@@ -450,5 +453,77 @@ contains
   end subroutine fft_extract_gtau
 
 
+
+  subroutine neq_continue_equilibirum__(g0,gk,dgk,g,self,Hk,Wtk,params,Kerk)
+    type(kb_contour_gf)                 :: g0(2,2)
+    type(kb_contour_gf)                 :: gk(:,:),gk_aux(size(gk,1),2),Kerk(size(gk,1),4)
+    type(kb_contour_dgf)                :: dgk(size(gk,1),2)
+    type(kb_contour_gf)                 :: g(2,2)
+    type(kb_contour_gf)                 :: self(2,2)
+    type(kb_contour_params)             :: params
+    real(8)                             :: Hk(size(gk)),Wtk(size(gk))
+    real(8)                             :: wm,res,ims
+    logical                             :: bool
+    integer                             :: i,j,k,ik,unit,len,N,L,Lf,Lk
+    complex(8)                          :: zeta
+    complex(8)                          :: Self_gtr
+    complex(8),allocatable,dimension(:) :: SxG
+    Lk=size(gk,1)
+!   if(.not.g0%status)stop "init_functions: g0 is not allocated"
+!   if(.not.g%status)stop "init_functions: g is not allocated"
+!   do ik=1,Lk
+!      if(.not.gk(ik)%status)stop "init_functions: gk(ik) is not allocated"
+!      if(.not.dgk(ik)%status)stop "init_functions: dgk(ik) is not allocated"
+!   enddo
+!   if(.not.self%status)stop "init_functions: self is not allocated"
+!   if(.not.params%status)stop "init_functions: params is not allocated"
+    !
+    N = params%Nt
+    L = params%Ntau
+    Lf= params%Niw
+    !
+    !INITIALIZE THE WEISS FIELD G0^{x=M,<,R,\lmix}
+!   call read_equilibrium_weiss(g0,params,Hk=Hk,Wtk=Wtk)!<== get G0^{x=iw,tau,M,<,R,\lmix}
+    !
+    !INITIALIZE THE SELF-ENERGY SELF^{x=M,<,R,\lmix}
+!   call read_equilibrium_sigma(self,params)            !<== get Sigma^{x=iw,tau,M,<,R,\lmix}
+    !INITIALIZE THE LOCAL GREEN'S FUNCTION Gloc^{x=M,<,R,\lmix}
+!   G=zero
+    do ik=1,Lk
+       call neq_setup_initial_conditions(gk_aux(ik,1),dgk(ik,1),self(1,1),hk(ik),params)
+       call neq_setup_initial_conditions(gk_aux(ik,2),dgk(ik,2),self(1,1),-hk(ik),params)
+
+       call convolute_kb_contour_gf(Kerk(ik,1),gk_aux(ik,1),self(1,2),params)
+       call convolute_kb_contour_gf(Kerk(ik,2),Kerk(ik,1),gk_aux(ik,2),params)
+       call convolute_kb_contour_gf(Kerk(ik,3),Kerk(ik,2),self(2,1),params)
+
+       do i=1,Lf
+          Gk(ik,1)%iw(i) = gk_aux(ik,1)%iw(i)/(1d0-Kerk(ik,3)%iw(i))
+       enddo
+       call fft_gf_iw2tau(Gk(ik,1)%iw,Gk(ik,1)%tau(0:),beta)
+       call fft_extract_gtau(Gk(ik,1)%tau,Gk(ik,1)%mats)
+
+       call convolute_kb_contour_gf(Kerk(ik,4),gk_aux(ik,2),self(2,1),params)
+       call convolute_kb_contour_gf(Gk(ik,2),Kerk(ik,4),gk(ik,1),params)
+
+       G(1,1)%mats(0:)  = G(1,1)%mats(0:)  + wtk(ik)*gk(ik,1)%mats(0:)
+       G(1,1)%tau(0:)   = G(1,1)%tau(0:)   + wtk(ik)*gk(ik,1)%tau(0:)
+       G(1,1)%iw(:)     = G(1,1)%iw(:)     + wtk(ik)*gk(ik,1)%iw(:)
+       G(1,1)%ret(1,1)  = G(1,1)%ret(1,1)  + wtk(ik)*gk(ik,1)%ret(1,1)
+       G(1,1)%less(1,1) = G(1,1)%less(1,1) + wtk(ik)*gk(ik,1)%less(1,1)
+       G(1,1)%lmix(1,0:)= G(1,1)%lmix(1,0:)+ wtk(ik)*gk(ik,1)%lmix(1,0:)
+
+       G(2,1)%mats(0:)  = G(2,1)%mats(0:)  + wtk(ik)*gk(ik,2)%mats(0:)
+       G(2,1)%tau(0:)   = G(2,1)%tau(0:)   + wtk(ik)*gk(ik,2)%tau(0:)
+       G(2,1)%iw(:)     = G(2,1)%iw(:)     + wtk(ik)*gk(ik,2)%iw(:)
+       G(2,1)%ret(1,1)  = G(2,1)%ret(1,1)  + wtk(ik)*gk(ik,2)%ret(1,1)
+       G(2,1)%less(1,1) = G(2,1)%less(1,1) + wtk(ik)*gk(ik,2)%less(1,1)
+       G(2,1)%lmix(1,0:)= G(2,1)%lmix(1,0:)+ wtk(ik)*gk(ik,2)%lmix(1,0:)
+
+       call get_bar(G(2,2),G(1,1),params)
+       call get_bar(G(1,2),G(2,1),params)
+    enddo
+    return
+  end subroutine neq_continue_equilibirum__
 
 end module NEQ_EQUILIBRIUM

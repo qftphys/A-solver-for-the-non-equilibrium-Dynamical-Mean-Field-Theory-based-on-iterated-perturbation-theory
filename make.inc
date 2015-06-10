@@ -3,6 +3,9 @@ PLAT=gnu
 #PRECOMPILATION FLAG (leave blank for serial code)
 FPP=
 
+
+
+
 #set here the absolute bath to the DMFT_TOOLS and SCIFORTRAN libraries:
 LIBROOT=/scratch/fperonaci/opt
 
