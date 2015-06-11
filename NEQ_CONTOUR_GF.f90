@@ -81,6 +81,12 @@ MODULE NEQ_CONTOUR_GF
      module procedure kb_half_trapz_d, kb_half_trapz_c
   end interface kb_half_trapz
 
+  interface add_kb_contour_gf
+     module procedure add_kb_contour_gf_
+     module procedure add_kb_contour_dgf
+     module procedure add_kb_contour_gf_d
+     module procedure add_kb_contour_gf_c
+  end interface add_kb_contour_gf
 
   public :: allocate_kb_contour_gf
   public :: allocate_kb_contour_dgf
@@ -107,7 +113,7 @@ MODULE NEQ_CONTOUR_GF
   !OVERLOAD OPERATORS
   public :: operator(*)
   public :: assignment(=)
- 
+
   public :: get_adv
   public :: get_rmix
   public :: get_bar
@@ -446,7 +452,7 @@ contains
   !BECAUSE POINTERS IS THE RESULT OF FUNCTION ITSELF (C).
   !ANYWAY THIS REQUIRE ONE TO CHECK ALL THE SIZES AND ALLOCATION
   !I RATHER PREFER TO USE THIS ROUTINE NOW...
-  subroutine add_kb_contour_gf(A,B,C,params)
+  subroutine add_kb_contour_gf_(A,B,C,params)
     type(kb_contour_gf)     :: A,B,C
     type(kb_contour_params) :: params
     integer                 :: N,L
@@ -466,7 +472,7 @@ contains
     C%mats(0:)  = A%mats(0:)  + B%mats(0:)
     C%tau(0:)   = A%tau(0:)   + B%tau(0:)
     C%iw(0:)    = A%iw(0:)    + B%iw(0:)
-  end subroutine  add_kb_contour_gf
+  end subroutine  add_kb_contour_gf_
 
   subroutine add_kb_contour_dgf(A,B,C,params)
     type(kb_contour_dgf)    :: A,B,C
@@ -486,6 +492,64 @@ contains
     C%ret(:)  = A%ret(:)  + B%ret(:)  
     C%lmix(0:)= A%lmix(0:)+ B%lmix(0:)
   end subroutine add_kb_contour_dgf
+
+  subroutine add_kb_contour_gf_d(A,B,C,params)
+    type(kb_contour_gf)     :: A,C
+    real(8),dimension(:)    :: B
+    type(kb_contour_params) :: params
+    integer                 :: N,L,i
+    logical                 :: checkA,checkC
+    if(  (.not.A%status).OR.&
+         (.not.C%status))stop "contour_gf/add_kb_contour_gf: A,B,C not allocated"
+    N   = params%Ntime
+    L   = params%Ntau
+    !
+    checkA=check_dimension_kb_contour(A,N,L) 
+    checkC=check_dimension_kb_contour(C,N,L)
+    if(size(B)<N)stop "contour_gf/add_kb_contour_gf: A,B,C not allocated"
+    C%less(:,:) = A%less(:,:)
+    C%ret(:,:)  = A%ret(:,:)
+    C%lmix(:,0:)= A%lmix(:,0:)
+    C%mats(0:)  = A%mats(0:)
+    C%tau(0:)   = A%tau(0:)
+    C%iw(0:)    = A%iw(0:)
+    !
+    do i=1,N
+       C%ret(i,i) = C%ret(i,i) + B(i)
+    enddo
+    do i=0,L
+       C%mats(i) = C%mats(i) + B(1)
+    enddo
+  end subroutine  add_kb_contour_gf_d
+
+  subroutine add_kb_contour_gf_c(A,B,C,params)
+    type(kb_contour_gf)     :: A,C
+    real(8),dimension(:)    :: B
+    type(kb_contour_params) :: params
+    integer                 :: N,L,i
+    logical                 :: checkA,checkC
+    if(  (.not.A%status).OR.&
+         (.not.C%status))stop "contour_gf/add_kb_contour_gf: A,B,C not allocated"
+    N   = params%Ntime
+    L   = params%Ntau
+    !
+    checkA=check_dimension_kb_contour(A,N,L) 
+    checkC=check_dimension_kb_contour(C,N,L)
+    if(size(B)<N)stop "contour_gf/add_kb_contour_gf: A,B,C not allocated"
+    C%less(:,:) = A%less(:,:)
+    C%ret(:,:)  = A%ret(:,:)
+    C%lmix(:,0:)= A%lmix(:,0:)
+    C%mats(0:)  = A%mats(0:)
+    C%tau(0:)   = A%tau(0:)
+    C%iw(0:)    = A%iw(0:)
+    !
+    do i=1,N
+       C%ret(i,i) = C%ret(i,i) + B(i)
+    enddo
+    do i=0,L
+       C%mats(i) = C%mats(i) + B(1)
+    enddo
+  end subroutine  add_kb_contour_gf_c
 
 
 
@@ -639,13 +703,13 @@ contains
     do j=1,N-1
        C%less(N,j)=zero
        do k=0,L
-!         AxB(k)=A%lmix(N,k)*conjg(B%lmix(j,L-k))
+          !         AxB(k)=A%lmix(N,k)*conjg(B%lmix(j,L-k))
           AxB(k)=A%lmix(N,k)*get_rmix(B,k,j,L)
        end do
        C%less(N,j)=C%less(N,j)-xi*dtau*kb_trapz(AxB(0:),0,L)
        !
        do k=1,j
-!         AxB(k)=A%less(N,k)*conjg(B%ret(j,k))
+          !         AxB(k)=A%less(N,k)*conjg(B%ret(j,k))
           AxB(k)=A%less(N,k)*get_adv(B,k,j)
        end do
        C%less(N,j)=C%less(N,j)+dt*kb_trapz(AxB(0:),1,j)
@@ -660,13 +724,13 @@ contains
     do i=1,N
        C%less(i,N)=zero
        do k=0,L
-!         AxB(k)=A%lmix(i,k)*conjg(B%lmix(n,L-k))
+          !         AxB(k)=A%lmix(i,k)*conjg(B%lmix(n,L-k))
           AxB(k)=A%lmix(i,k)*get_rmix(B,k,N,L)
        end do
        C%less(i,N)=C%less(i,N)-xi*dtau*kb_trapz(AxB(0:),0,L)
        !
        do k=1,N
-!         AxB(k)=A%less(i,k)*conjg(B%ret(N,k))
+          !         AxB(k)=A%less(i,k)*conjg(B%ret(N,k))
           AxB(k)=A%less(i,k)*get_adv(B,k,N)
        end do
        C%less(i,N)=C%less(i,N)+dt*kb_trapz(AxB(0:),1,N)
@@ -722,17 +786,17 @@ contains
     !
     if (N.eq.1) then
        ! Matsubara
-        C%mats = A%mats*B(0)
+       C%mats = A%mats*B(0)
     endif
     !
     do j=1,N
-    !Ret. component
+       !Ret. component
        C%ret(n,j) = A%ret(n,j)*B(j)
-    !Less. component
+       !Less. component
        C%less(n,j) = A%less(n,j)*B(j)
     enddo
     do i=1,N-1
-    !Less. component
+       !Less. component
        C%less(i,n)=A%less(i,N)*B(N)
     enddo
     !
@@ -823,13 +887,13 @@ contains
     do j=1, N-1
        G%less(N,j)=Q%less(N,j)
        do s=0,L
-!         KxG(s)=K%lmix(N,s)*conjg(G%lmix(j,L-s))
+          !         KxG(s)=K%lmix(N,s)*conjg(G%lmix(j,L-s))
           KxG(s)=K%lmix(N,s)*get_rmix(G,s,j,L)
        enddo
        G%less(N,j)=G%less(N,j)-xi*dtau*kb_trapz(KxG(0:),0,L)
        !
        do s=1,j
-!         KxG(s)=K%less(N,s)*conjg(G%ret(j,s))
+          !         KxG(s)=K%less(N,s)*conjg(G%ret(j,s))
           KxG(s)=K%less(N,s)*get_adv(G,s,j)
        enddo
        G%less(N,j)=G%less(N,j)+dt*kb_trapz(KxG(0:),1,j)
@@ -843,25 +907,25 @@ contains
     !
     ! G^<(t_{i},t_{N}) <= Hermite conjugate
     if (.not.G%anomalous) then
-    do i=1,N-1
-       G%less(i,N) = -conjg(G%less(N,i))
-    end do
+       do i=1,N-1
+          G%less(i,N) = -conjg(G%less(N,i))
+       end do
     else
-    do i=1,N-1
-       G%less(i,N) = G%less(N,i)+G%ret(N,i)
-    end do
+       do i=1,N-1
+          G%less(i,N) = G%less(N,i)+G%ret(N,i)
+       end do
     endif
     !
     ! G^{<}(t_{n},t_{n}) <= Diagonal
     G%less(N,N)=Q%less(N,N)
     do s=0,L
-!      KxG(s)=K%lmix(N,s)*conjg(G%lmix(N,L-s))
+       !      KxG(s)=K%lmix(N,s)*conjg(G%lmix(N,L-s))
        KxG(s)=K%lmix(N,s)*get_rmix(G,s,N,L)
     end do
     G%less(N,N)=G%less(N,N)-xi*dtau*kb_trapz(KxG(0:),0,L)
     !
     do s=1,N
-!      KxG(s)=K%less(N,s)*conjg(G%ret(N,s))
+       !      KxG(s)=K%less(N,s)*conjg(G%ret(N,s))
        KxG(s)=K%less(N,s)*get_adv(G,s,N)
     end do
     G%less(N,N)=G%less(N,N)+dt*kb_trapz(KxG(0:),1,N)
@@ -963,12 +1027,12 @@ contains
     do j=1,N-1
        G%less(N,j)=G%less(N-1,j) + 0.5d0*dt*dG%less(j)
        do s=0,L
-!         KxG(s)=K%lmix(N,s)*conjg(G%lmix(j,L-s))
+          !         KxG(s)=K%lmix(N,s)*conjg(G%lmix(j,L-s))
           KxG(s)=K%lmix(N,s)*get_rmix(G,s,j,L)
        end do
        dG_new%less(j)=-xi*(-xi)*dtau*kb_trapz(KxG(0:),0,L)
        do s=1,j
-!         KxG(s)=K%less(N,s)*conjg(G%ret(j,s))
+          !         KxG(s)=K%less(N,s)*conjg(G%ret(j,s))
           KxG(s)=K%less(N,s)*get_adv(G,s,j)
        end do
        dG_new%less(j)=dG_new%less(j)-xi*dt*kb_trapz(KxG(0:),1,j)!<= -iQ(t)
@@ -987,24 +1051,24 @@ contains
     ! G^<(t_{i},t_{N}), d/dt G^<(t_{i},t_{N}) <== upper left triangle
     ! Hermitian conjugate G
     if (.not.G%anomalous) then
-    do i=1,N-1
-       G%less(i,N)=-conjg(G%less(N,i))
-    end do
+       do i=1,N-1
+          G%less(i,N)=-conjg(G%less(N,i))
+       end do
     else
-    do i=1,N-1
-       G%less(i,N)=G%less(N,i)+G%ret(N,i)
-    end do
+       do i=1,N-1
+          G%less(i,N)=G%less(N,i)+G%ret(N,i)
+       end do
     endif
     !
     ! d/dt G^<(t_{N-1},t_{N})
     dG_less=-xi*H(N-1)*G%less(N-1,N)
     do s=0,L
-!      KxG(s)=K%lmix(N-1,s)*conjg(G%lmix(N,L-s))
+       !      KxG(s)=K%lmix(N-1,s)*conjg(G%lmix(N,L-s))
        KxG(s)=K%lmix(N-1,s)*get_rmix(G,s,N,L)
     end do
     dG_less=dG_less-xi*(-xi)*dtau*kb_trapz(KxG(0:),0,L)
     do s=1,N
-!      KxG(s)=K%less(N-1,s)*conjg(G%ret(N,s))
+       !      KxG(s)=K%less(N-1,s)*conjg(G%ret(N,s))
        KxG(s)=K%less(N-1,s)*get_adv(G,s,N)
     end do
     dG_less=dG_less-xi*dt*kb_trapz(KxG(0:),1,N)
@@ -1016,13 +1080,13 @@ contains
     !G^<(N,N), d/dt G^<(N,N)
     G%less(N,N)=G%less(N-1,N)+0.5d0*dt*dG_less
     do s=0,L
-!      KxG(s)=K%lmix(N,s)*conjg(G%lmix(N,L-s))
+       !      KxG(s)=K%lmix(N,s)*conjg(G%lmix(N,L-s))
        KxG(s)=K%lmix(N,s)*get_rmix(G,s,N,L)
     end do
     dG_new%less(N)=-xi*(-xi)*dtau*kb_trapz(KxG(0:),0,L)
     !
     do s=1,N
-!      KxG(s)=K%less(N,s)*conjg(G%ret(N,s))
+       !      KxG(s)=K%less(N,s)*conjg(G%ret(N,s))
        KxG(s)=K%less(N,s)*get_adv(G,s,N)
     end do
     dG_new%less(N)=dG_new%less(N)-xi*dt*kb_trapz(KxG(0:),1,N)
@@ -1282,11 +1346,11 @@ contains
     integer :: i,j
     complex(8) :: adv
     if (.not.G%anomalous) then
-      adv=conjg(G%ret(j,i))
-      return
+       adv=conjg(G%ret(j,i))
+       return
     else
-      adv=G%ret(j,i)
-      return
+       adv=G%ret(j,i)
+       return
     endif
   end function get_adv
 
@@ -1296,11 +1360,11 @@ contains
     integer :: i,j,L
     complex(8) :: rmix
     if (.not.G%anomalous) then
-      rmix=conjg(G%lmix(j,L-i))
-      return
+       rmix=conjg(G%lmix(j,L-i))
+       return
     else
-      rmix=G%lmix(j,i)
-      return
+       rmix=G%lmix(j,i)
+       return
     endif
   end function get_rmix
 
@@ -1310,24 +1374,27 @@ contains
     integer :: i,j
     complex(8) :: gtr
     if (.not.G%anomalous) then
-      if (i.ge.j) then
-        gtr=G%less(i,j)+G%ret(i,j)
-        return
-      else
-        gtr=G%less(i,j)-conjg(G%ret(j,i))
-        return
-      endif
+       if (i.ge.j) then
+          gtr=G%less(i,j)+G%ret(i,j)
+          return
+       else
+          gtr=G%less(i,j)-conjg(G%ret(j,i))
+          return
+       endif
     else
-      gtr=G%less(j,i)
-      return
+       gtr=G%less(j,i)
+       return
     endif
   end function get_gtr
 
 
+  !+-----------------------------------------------------------------------------+!
+  !PURPOSE:  comment
+  !+-----------------------------------------------------------------------------+!
   subroutine get_bar(A,B,params)
     type(kb_contour_gf)                 :: A,B
     type(kb_contour_params)             :: params
-    integer                             :: N,L
+    integer                             :: N,L,Lf
     real(8)                             :: dt,dtau
     integer                             :: i,j,k,itau,jtau
     logical                             :: checkA,checkB,checkC
@@ -1336,11 +1403,31 @@ contains
          (.not.B%status))stop "contour_gf/get_bar_kb_contour_gf: A,B,C not allocated"
     N   = params%Nt      !<== work with the ACTUAL size of the contour
     L   = params%Ntau
+    Lf  = params%Niw
     dt  = params%dt
     dtau= params%dtau
     !
     checkA=check_dimension_kb_contour(A,params%Ntime,L) 
     checkB=check_dimension_kb_contour(B,params%Ntime,L)
+    !
+    if(N==1)then
+       ! Matsubara imaginary time component
+       if (.not.B%anomalous) then
+          A%mats(0:L) = B%mats(L:0:-1)
+          A%tau(0:Lf) = B%tau(Lf:0:-1)
+       else
+          A%mats(0:L) = B%mats(0:L)
+          A%tau(0:Lf) = B%tau(0:Lf)
+       endif
+       !
+       ! Matsubara frequencies component
+       if (.not.B%anomalous) then
+          A%iw = -conjg(B%iw)
+       else
+          A%iw = B%iw
+       endif
+    endif
+    !
     !
     !Ret. component
     if (.not.B%anomalous) then
