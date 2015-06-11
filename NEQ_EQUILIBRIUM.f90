@@ -497,6 +497,13 @@ contains
        call convolute_kb_contour_gf(Kerk(ik,2),Kerk(ik,1),gk_aux(ik,2),params)
        call convolute_kb_contour_gf(Kerk(ik,3),Kerk(ik,2),self(2,1),params)
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+       ! Now the subroutine convolute, if N==0, does the convolution also in
+       ! Matsubara frequencies (a mere multiplication) and in Matsubara
+       ! imaginary times. In this way we can use the equation satisfied by G and
+       ! F_bar also to initialise them.
+
        do i=1,Lf
           Gk(ik,1)%iw(i) = gk_aux(ik,1)%iw(i)/(1d0-Kerk(ik,3)%iw(i))
        enddo
@@ -505,6 +512,20 @@ contains
 
        call convolute_kb_contour_gf(Kerk(ik,4),gk_aux(ik,2),self(2,1),params)
        call convolute_kb_contour_gf(Gk(ik,2),Kerk(ik,4),gk(ik,1),params)
+
+       ! Alternatively, one can do the initialisation 'by hand'
+       
+       do i=i,Lf
+          Gk(ik,1)%iw(i)=-(xi*params%wm(i)-hk(ik))/&
+                          (params%wm(i)**2+(hk(ik)+self(1,1))**2+self(1,2)*self(2,1))
+          Gk(ik,2)%iw(i)=-self(2,1)/(params%wm(i)**2+(hk(ik)+self(1,1))**2+self(1,2)*self(2,1))
+       enddo
+       call fft_gf_iw2tau(Gk(ik,1)%iw,Gk(ik,1)%tau(0:),beta)
+       call fft_extract_gtau(Gk(ik,1)%tau,Gk(ik,1)%mats)
+       call fft_gf_iw2tau(Gk(ik,2)%iw,Gk(ik,2)%tau(0:),beta)
+       call fft_extract_gtau(Gk(ik,2)%tau,Gk(ik,2)%mats)
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
        G(1,1)%mats(0:)  = G(1,1)%mats(0:)  + wtk(ik)*gk(ik,1)%mats(0:)
        G(1,1)%tau(0:)   = G(1,1)%tau(0:)   + wtk(ik)*gk(ik,1)%tau(0:)

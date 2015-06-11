@@ -577,7 +577,9 @@ contains
     allocate(AxB(0:max(L,N)))
     !
     if(N==1) then
-       ! Matsubara
+       ! Matsubara frequencies
+       C%iw=A%iw*B%iw
+       ! Matsubara times
        AxB(0:) = zero
        do jtau=0,L
           do k=0,jtau
