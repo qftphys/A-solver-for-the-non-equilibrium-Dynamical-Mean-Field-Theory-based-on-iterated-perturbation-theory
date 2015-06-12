@@ -567,8 +567,8 @@ contains
     !C^<(t,t')=-i\int_0^{beta} ds A^\lmix(t,s)*B^\rmix(s,t')
     !             +\int_0^{t'} ds A^<(t,s)*B^A(s,t')
     !             +\int_0^{t} ds A^R(t,s)*B^<(s,t')
-    ! (t,t')=>(N,j) <==> Vertical side, no tip (j=1,N-1)
-    do j=1,N-1
+    ! (t,t')=>(N,j) <==> Vertical side, with tip (j=1,N) !!no tip (j=1,N-1)
+    do j=1,N!-1
        C%less(N,j)=zero
        do k=0,L
           AxB(k)=A%lmix(N,k)*conjg(B%lmix(j,L-k))
@@ -586,24 +586,27 @@ contains
        C%less(N,j)=C%less(N,j)+dt*kb_trapz(AxB(0:),1,N)
     end do
     !
-    ! (t,t')=>(i,N) <==> Horizontal side, w/ tip (i=1,N)
-    do i=1,N
+    ! ! (t,t')=>(i,N) <==> Horizontal side, w/ tip (i=1,N)
+    do i=1,N-1
        C%less(i,N)=zero
-       do k=0,L
-          AxB(k)=A%lmix(i,k)*conjg(B%lmix(n,L-k))
-       end do
-       C%less(i,N)=C%less(i,N)-xi*dtau*kb_trapz(AxB(0:),0,L)
-       !
-       do k=1,N
-          AxB(k)=A%less(i,k)*conjg(B%ret(N,k))
-       end do
-       C%less(i,N)=C%less(i,N)+dt*kb_trapz(AxB(0:),1,N)
-       !
-       do k=1,i
-          AxB(k)=A%ret(i,k)*B%less(k,N)
-       end do
-       C%less(i,N)=C%less(i,N)+dt*kb_trapz(AxB(0:),1,i)
-    end do
+    enddo
+    ! do i=1,N
+    !    C%less(i,N)=zero
+    !    do k=0,L
+    !       AxB(k)=A%lmix(i,k)*conjg(B%lmix(n,L-k))
+    !    end do
+    !    C%less(i,N)=C%less(i,N)-xi*dtau*kb_trapz(AxB(0:),0,L)
+    !    !
+    !    do k=1,N
+    !       AxB(k)=A%less(i,k)*conjg(B%ret(N,k))
+    !    end do
+    !    C%less(i,N)=C%less(i,N)+dt*kb_trapz(AxB(0:),1,N)
+    !    !
+    !    do k=1,i
+    !       AxB(k)=A%ret(i,k)*B%less(k,N)
+    !    end do
+    !    C%less(i,N)=C%less(i,N)+dt*kb_trapz(AxB(0:),1,i)
+    ! end do
     !    
     if(present(dcoeff))then
        C%lmix(N,0:L) = dcoeff*C%lmix(N,0:L)
