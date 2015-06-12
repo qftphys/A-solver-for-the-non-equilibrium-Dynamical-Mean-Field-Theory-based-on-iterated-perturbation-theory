@@ -9,8 +9,8 @@ program neqDMFT
   character(len=16)                     :: finput
   type(kb_contour_gf)                   :: Sbath
   type(kb_contour_gf),dimension(2,2)    :: Gloc,SigmaReg,Sigma,Gwf
-  type(kb_contour_gf)                   :: K_gamma(5),K_delta(5),K_epsi(2),K_zeta(2)
-  type(kb_contour_gf),allocatable       :: Gk(:,:),Gk_aux(:,:),Kerk(:,:)
+  type(kb_contour_gf)                   :: G0aux(2),Kerk(4),K_gamma(5),K_delta(5),K_epsi(2),K_zeta(2)
+  type(kb_contour_gf),allocatable       :: Gk(:,:),Gk_aux(:,:)
   type(kb_contour_dgf),allocatable      :: dGk_aux(:,:),dGk_aux_old(:,:)
   type(kb_contour_dgf),dimension(2)     :: Gedge,G0edge
   complex(8),dimension(:,:),allocatable :: Ham
@@ -49,7 +49,11 @@ program neqDMFT
   call allocate_kb_contour_gf(Sigma,cc_params) !Self-Energy function
   call allocate_kb_contour_gf(Gloc,cc_params)  !Local Green's function
   call allocate_kb_contour_gf(Gwf,cc_params)   !Local Weiss-Field function
+  call allocate_kb_contour_gf(G0aux,cc_params)
   call allocate_kb_contour_dgf(Gedge,cc_params)
+  do i=1,4
+     call allocate_kb_contour_gf(Kerk(i),cc_params)
+  enddo
   do i=1,5
      call allocate_kb_contour_gf(K_gamma(i),cc_params)
      call allocate_kb_contour_gf(K_delta(i),cc_params)
@@ -62,13 +66,11 @@ program neqDMFT
   allocate(Gk_aux(2,Lk))
   allocate(dGk_aux(2,Lk))
   allocate(dGk_aux_old(2,Lk))
-  allocate(Kerk(4,Lk))
   do ik=1,Lk
      call allocate_kb_contour_gf(Gk(:,ik),cc_params)
      call allocate_kb_contour_gf(Gk_aux(:,ik),cc_params)
      call allocate_kb_contour_dgf(dGk_aux(:,ik),cc_params)
      call allocate_kb_contour_dgf(dGk_aux_old(:,ik),cc_params)
-     call allocate_kb_contour_gf(Kerk(:,ik),cc_params)
   end do
   allocate(ham(cc_params%Ntime,Lk))
   allocate(nk(cc_params%Ntime,Lk))
@@ -78,13 +80,6 @@ program neqDMFT
   !READ OR GUESS THE INITIAL WEISS FIELD G0 (t=t'=0)
   cc_params%Nt=1
   call neq_continue_equilibirum(Gwf,Gk,Gk_aux,dGk_aux,Gloc,Sigma,epsik,wt,cc_params)
-  call convolute_kb_contour_gf(Gk_aux(1,ik),Sigma(1,2),Kerk(1,ik),params)
-  call convolute_kb_contour_gf(Kerk(1,ik),Gk_aux(2,ik),Kerk(2,ik),params)
-  call convolute_kb_contour_gf(Kerk(2,ik),Sigma(2,1)  ,Kerk(3,ik),params)
-  call convolute_kb_contour_gf(Gk_aux(2,ik),Sigma(2,1),Kerk(4,ik),params)
-  !ACTHUNG
-  stop "the convolution is slightly wrong"
-  !<
   !call measure_observables(Gloc,Sigma,cc_params)
   do ik=1,Lk
      nk(1,ik)=dimag(Gk(1,ik)%less(1,1))
@@ -133,20 +128,20 @@ program neqDMFT
         Gedge(2)=zero
         do ik=1,Lk
            ! solve a VIDE for g11k
-           call vide_kb_contour_gf(Ham(:,ik),Sigma(1,1),Gk_aux(1,ik),dGk_aux_old(1,ik),dGk_aux(1,ik),cc_params)
+           call vide_kb_contour_gf( Ham(:,ik),Sigma(1,1),Gk_aux(1,ik),dGk_aux_old(1,ik),dGk_aux(1,ik),cc_params)
            ! solve a VIDE for f21k=>g22k
            call vide_kb_contour_gf(-Ham(:,ik),Sigma(2,2),Gk_aux(2,ik),dGk_aux_old(2,ik),dGk_aux(2,ik),cc_params)
            ! start a series of convolutions to get G && Fbar components of the G(k) function
            ! Get Ker3 = g11k * S * f21k * barS
+           call convolute_kb_contour_gf(Gk_aux(1,ik),Sigma(1,2),Kerk(1),params)
+           call convolute_kb_contour_gf(Kerk(1),Gk_aux(2,ik),Kerk(2),params)
+           call convolute_kb_contour_gf(Kerk(2),Sigma(2,1)  ,Kerk(3),params,dcoeff=-1d0)
            ! Get Ker4= f21k * S
-           call convolute_kb_contour_gf(Gk_aux(1,ik),Sigma(1,2),Kerk(1,ik),params)
-           call convolute_kb_contour_gf(Kerk(1,ik),Gk_aux(2,ik),Kerk(2,ik),params)
-           call convolute_kb_contour_gf(Kerk(2,ik),Sigma(2,1)  ,Kerk(3,ik),params,dcoeff=-1d0)
-           call convolute_kb_contour_gf(Gk_aux(2,ik),Sigma(2,1),Kerk(4,ik),params)
+           call convolute_kb_contour_gf(Gk_aux(2,ik),Sigma(2,1),Kerk(4),params)
            !solve a VIE for Gk_11
-           call vie_kb_contour_gf(Gk_aux(1,ik),Kerk(3,ik),Gk(1,ik),cc_params)
+           call vie_kb_contour_gf(Gk_aux(1,ik),Kerk(3),Gk(1,ik),cc_params)
            !solve a convoloution for barFk_21
-           call convolute_kb_contour_gf(Gk_aux(2,ik),Kerk(4,ik),Gk(2,ik),cc_params)
+           call convolute_kb_contour_gf(Gk_aux(2,ik),Kerk(4),Gk(2,ik),cc_params)
            !Sum over K the Gk,Fk:
            Gedge(1)%ret(1:itime) = Gedge(1)%ret(1:itime)  + wt(ik)*Gk(1,ik)%ret(itime,1:itime)
            Gedge(1)%less(1:itime)= Gedge(1)%less(1:itime) + wt(ik)*Gk(1,ik)%less(itime,1:itime)
@@ -166,10 +161,33 @@ program neqDMFT
         call get_bar(Gloc(2,2),Gloc(1,1),cc_params)
         call get_bar(Gloc(1,2),Gloc(2,1),cc_params)
 
-
-
-
-
+        !Solve the VIE for auxiliary weiss fields: g0,fbar0
+        ! g0 + K*g0 = 11 ; K=G*\Sigma + F*\bar\Self
+        call convolute_kb_contour_gf(Gloc(1,1),SigmaReg(1,1),Kerk(1),cc_params)
+        call convolute_kb_contour_gf(Gloc(1,2),SigmaReg(2,1),Kerk(2),cc_params)
+        call add_kb_contour_gf(Kerk(1),Kerk(2),Kerk(3),cc_params)
+        call vie_kb_contour_gf(Kerk(3),G0aux(1),cc_params)
+        ! fbar0 + K*fbar0 = 11 ; K=\bar G*\bar\Sigma + \bar F*\Self
+        call convolute_kb_contour_gf(Gloc(2,2),SigmaReg(2,2),Kerk(1),cc_params)
+        call convolute_kb_contour_gf(Gloc(2,1),SigmaReg(1,2),Kerk(2),cc_params)
+        call add_kb_contour_gf(Kerk(1),Kerk(2),Kerk(3),cc_params)
+        call vie_kb_contour_gf(Kerk(3),G0aux(2),cc_params)
+        !
+        !evaluate few convolutions used in the calculation of G0,F0 fields:
+        ! K1 = g0*G - g0*G*S*fbar0*Fbar - g0*F*Sigmabar*fbar0*Fbar
+        ! K1 = K_gamma1 - K_gamma(4) - K_delta(4)
+        call convolute_kb_contour_gf(G0aux(1),Gloc(1,1),K_gamma(1),cc_params)
+        !
+        call convolute_kb_contour_gf(K_gamma(1),SigmaReg(1,2),K_gamma(2),cc_params)
+        call convolute_kb_contour_gf(K_gamma(2),G0aux(2),K_gamma(3),cc_params)
+        call convolute_kb_contour_gf(K_gamma(3),Gloc(2,1),K_gamma(4),cc_params)
+        !
+        call convolute_kb_contour_gf(G0aux(1),Gloc(1,2),K_delta(1),cc_params)
+        call convolute_kb_contour_gf(K_delta(1),SigmaReg(2,2),K_delta(2),cc_params)
+        call convolute_kb_contour_gf(K_delta(2),G0aux(2),K_delta(3),cc_params)
+        call convolute_kb_contour_gf(K_delta(3),Gloc(2,1),K_delta(4),cc_params)
+        !
+        
 
         !update the weiss field by solving the integral equation:
         ! G0 + K*G0 = Q , with K = G*\Sigma and Q = G
