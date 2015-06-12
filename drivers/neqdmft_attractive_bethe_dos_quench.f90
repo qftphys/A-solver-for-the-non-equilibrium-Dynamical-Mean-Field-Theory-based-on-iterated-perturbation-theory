@@ -1,11 +1,5 @@
 program neqDMFT
   USE NEQ_DMFT_IPT
-  ! USE NEQ_CONTOUR
-  ! USE NEQ_CONTOUR_GF
-  ! USE NEQ_VARS_GLOBAL
-  ! USE NEQ_AUX_FUNX
-  ! USE NEQ_MEASURE
-  ! USE NEQ_IPT
   USE SCIFOR
   USE DMFT_TOOLS
   implicit none
@@ -15,7 +9,7 @@ program neqDMFT
   character(len=16)                     :: finput
   type(kb_contour_gf)                   :: Sbath
   type(kb_contour_gf),dimension(2,2)    :: Gloc,SigmaReg,Sigma,Gwf
-  type(kb_contour_gf)                   :: Ker1,Ker2
+  type(kb_contour_gf)                   :: K_gamma(5),K_delta(5),K_epsi(2),K_zeta(2)
   type(kb_contour_gf),allocatable       :: Gk(:,:),Gk_aux(:,:),Kerk(:,:)
   type(kb_contour_dgf),allocatable      :: dGk_aux(:,:),dGk_aux_old(:,:)
   type(kb_contour_dgf),dimension(2)     :: Gedge,G0edge
@@ -55,10 +49,20 @@ program neqDMFT
   call allocate_kb_contour_gf(Sigma,cc_params) !Self-Energy function
   call allocate_kb_contour_gf(Gloc,cc_params)  !Local Green's function
   call allocate_kb_contour_gf(Gwf,cc_params)   !Local Weiss-Field function
-  call allocate_kb_contour_gf(Ker1,cc_params)
-  call allocate_kb_contour_gf(Ker2,cc_params)
   call allocate_kb_contour_dgf(Gedge,cc_params)
-  allocate(Gk(2,Lk),Gk_aux(2,Lk),dGk_aux(2,Lk),dGk_aux_old(2,Lk),Kerk(4,Lk))
+  do i=1,5
+     call allocate_kb_contour_gf(K_gamma(i),cc_params)
+     call allocate_kb_contour_gf(K_delta(i),cc_params)
+  enddo
+  do i=1,2
+     call allocate_kb_contour_gf(K_epsi(i),cc_params)
+     call allocate_kb_contour_gf(K_zeta(i),cc_params)
+  enddo
+  allocate(Gk(2,Lk))
+  allocate(Gk_aux(2,Lk))
+  allocate(dGk_aux(2,Lk))
+  allocate(dGk_aux_old(2,Lk))
+  allocate(Kerk(4,Lk))
   do ik=1,Lk
      call allocate_kb_contour_gf(Gk(:,ik),cc_params)
      call allocate_kb_contour_gf(Gk_aux(:,ik),cc_params)
@@ -162,7 +166,10 @@ program neqDMFT
         call get_bar(Gloc(2,2),Gloc(1,1),cc_params)
         call get_bar(Gloc(1,2),Gloc(2,1),cc_params)
 
-        !ARRIVATI QUI:
+
+
+
+
 
         !update the weiss field by solving the integral equation:
         ! G0 + K*G0 = Q , with K = G*\Sigma and Q = G
