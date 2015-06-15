@@ -11,16 +11,13 @@ module NEQ_EQUILIBRIUM
   private
 
   interface neq_continue_equilibirum
-     module procedure neq_continue_equilibirum_bethe,neq_continue_equilibirum_
+     module procedure neq_continue_equilibirum_normal
+     module procedure neq_continue_equilibirum_bethe
   end interface neq_continue_equilibirum
 
   public  :: neq_continue_equilibirum     ! read G0 and continue the equilibrium GF,Sigma,G0 to the t=0 contour.
   public  :: neq_setup_initial_conditions ! setup the initial conditions for the e/k dependent GF.
 
-
-  ! public :: read_equilibrium_weiss
-  ! public :: read_equilibrium_sigma
-  ! public :: fft_extract_gtau
 
   real(8),public :: h1,h2,hDC,dens
 
@@ -30,7 +27,7 @@ contains
   !+-------------------------------------------------------------------+
   !PURPOSE: obtain and continue the  equilibrium to Keldysh contour
   !+-------------------------------------------------------------------+
-  subroutine neq_continue_equilibirum_(g0,gk,dgk,g,self,Hk,Wtk,params)
+  subroutine neq_continue_equilibirum_normal(g0,gk,dgk,g,self,Hk,Wtk,params)
     type(kb_contour_gf)                 :: g0
     type(kb_contour_gf)                 :: gk(:)
     type(kb_contour_dgf)                :: dgk(size(gk))
@@ -60,43 +57,9 @@ contains
     !
     !INITIALIZE THE WEISS FIELD G0^{x=M,<,R,\lmix}
     call read_equilibrium_weiss(g0,params,Hk=Hk,Wtk=Wtk)!<== get G0^{x=iw,tau,M,<,R,\lmix}
-    ! Gcoeff = tail_coeff_glat(Ui,h1,h2,hDC)
-    ! call fft_gf_iw2tau(g0%iw,g0%tau(0:),params%beta,Gcoeff)
-    ! call extract_gtau_(g0%tau,g0%mats)
-    ! g0%less(1,1) = -xi*g0%mats(L)
-    ! g0%ret(1,1)  = -xi
-    ! forall(i=0:L)g0%lmix(1,i)=-xi*g0%mats(L-i)
     !
     !INITIALIZE THE SELF-ENERGY SELF^{x=M,<,R,\lmix}
     call read_equilibrium_sigma(self,params)            !<== get Sigma^{x=iw,tau,M,<,R,\lmix}
-    ! ! !(this step depends on the imp. solv.)
-    ! ! ! self^M(0,0) = -*U0*U0*G0(tau)*G0(-tau)*G0(tau)
-    ! ! ! self^<(0,0) = i^3*U*U*G0(0-)*G0(0+)*G0(0-)
-    ! ! ! self^>(0,0) = i^3*U*U*G0(0+)*G0(0-)*G0(0+)
-    ! ! ! self^\lmix(0,t) = i^3*U*U0*G0(-t)*G0(t)*G0(-t)
-    ! ! ! self^R(0,0) = self^> - self^<
-    ! ! do j=0,Lf
-    ! !    self%tau(j) = Ui*Ui*g0%tau(j)*g0%tau(Lf-j)*g0%tau(j)
-    ! ! end do
-    ! ! call extract_gtau_(self%tau,self%mats)
-    ! ! ! Scoeff  = tail_coeff_sigma(Ui,0.5d0)
-    ! ! call fft_sigma_tau2iw(self%iw,self%tau(0:),beta)!Scoeff)
-    ! ! if(Ui==0d0)self%iw=zero
-    ! ! Self%iw = xi*dimag(self%iw)                                   !imposing half-filling symmetry
-    ! ! ! Self%less(1,1)=(xi**3)*U*U*g0%mats(L)*g0%mats(0)*g0%mats(L)
-    ! ! ! Self_gtr      =(xi**3)*U*U*g0%mats(0)*g0%mats(L)*g0%mats(0)
-    ! ! ! Self%ret(1,1) = Self_gtr - Self%less(1,1)
-    ! ! ! do j=0,L
-    ! ! !    Self%lmix(1,j)=(xi**3)*U*Ui*g0%mats(L-j)*g0%mats(j)*g0%mats(L-j)
-    ! ! ! end do
-    ! Scoeff  = tail_coeff_sigma(Ui,dens)
-    ! call fft_sigma_iw2tau(self%iw,self%tau,beta,Scoeff)
-    ! call extract_gtau_(self%tau,self%mats)
-    ! if(Ui==0d0)self%tau=0d0
-    ! if(Ui==0d0)self%mats=0d0
-    ! self%less(1,1) = -xi*self%mats(L)                  !OK
-    ! self%ret(1,1) =   xi*(self%mats(L)-self%mats(0))   !OK
-    ! forall(i=0:L)self%lmix(1,i)=-xi*self%mats(L-i)     !small errors near 0,beta
     !
     !INITIALIZE THE LOCAL GREEN'S FUNCTION Gloc^{x=M,<,R,\lmix}
     G=zero
@@ -110,7 +73,7 @@ contains
        G%lmix(1,0:)= G%lmix(1,0:)+ wtk(ik)*gk(ik)%lmix(1,0:)
     enddo
     return
-  end subroutine neq_continue_equilibirum_
+  end subroutine neq_continue_equilibirum_normal
 
 
   subroutine neq_continue_equilibirum_bethe(g0,dg0,g,self,params,wband)
@@ -140,57 +103,9 @@ contains
     !
     !CHECK IF G0(IW) IS AVAILABLE OR START FROM THE NON-INTERACTING SOLUTION
     call read_equilibrium_weiss(g0,params,wband=wband)!<== get G0^{x=iw,tau,M,<,R,\lmix}
-    ! inquire(file=trim(g0file),exist=bool)
-    ! if(bool)then
-    !    write(*,"(A)")"Reading initial G0(iw) from file "//reg(g0file)
-    !    unit = free_unit()
-    !    open(unit,file=reg(g0file),status='old')
-    !    i = file_length(reg(g0file))
-    !    if(i/=Lf)then
-    !       print*,"init_equilibrium_weiss_field: Lfreq in +g0file does not correspond",i
-    !       stop
-    !    endif
-    !    do i=1,Lf
-    !       read(unit,*)wm,ims,res
-    !       g0%iw(i) = dcmplx(res,ims)
-    !    enddo
-    !    close(unit)
-    ! else
-    !    write(*,"(A)")"Start from Non-interacting G0(iw)"
-    !    do i=1,Lf
-    !       wm    = pi/beta*dble(2*i-1)
-    !       zeta  = xi*wm
-    !       g0%iw(i) = gfbethe(wm,zeta,wband)
-    !    enddo
-    ! endif
-    ! !
-    ! !INITIALIZE THE WEISS FIELD G0^{x=M,<,R,\lmix}
-    ! Gcoeff = tail_coeff_glat(U,0.5d0,0d0,0d0)
-    ! call fft_gf_iw2tau(g0%iw,g0%mats(0:),params%beta,Gcoeff)
-    ! g0%less(1,1) = -xi*g0%mats(L)
-    ! g0%ret(1,1)  = -xi
-    ! forall(i=0:L)g0%lmix(1,i)=-xi*g0%mats(L-i)
     !
     !INITIALIZE THE SELF-ENERGY SELF^{x=M,<,R,\lmix}
     call read_equilibrium_sigma(self,params)            !<== get Sigma^{x=iw,tau,M,<,R,\lmix}
-    ! !(this step depends on the imp. solv.)
-    ! ! self^M(0,0) = -*U0*U0*G0(tau)*G0(-tau)*G0(tau)
-    ! ! self^<(0,0) = i^3*U*U*G0(0-)*G0(0+)*G0(0-)
-    ! ! self^>(0,0) = i^3*U*U*G0(0+)*G0(0-)*G0(0+)
-    ! ! self^\lmix(0,t) = i^3*U*U0*G0(-t)*G0(t)*G0(-t)
-    ! ! self^R(0,0) = self^> - self^<
-    ! do j=0,L
-    !    Self%mats(j) = Ui*Ui*g0%mats(j)*g0%mats(L-j)*g0%mats(j)
-    ! end do
-    ! Scoeff  = tail_coeff_sigma(Ui,0.5d0)
-    ! call fft_sigma_tau2iw(Self%iw,Self%mats(0:),beta,Scoeff)
-    ! Self%iw = xi*dimag(self%iw) !!ACTHUNG: imposing half-filling symmetry
-    ! Self%less(1,1)=(xi**3)*U*U*g0%mats(L)*g0%mats(0)*g0%mats(L)
-    ! Self_gtr      =(xi**3)*U*U*g0%mats(0)*g0%mats(L)*g0%mats(0)
-    ! do j=0,L
-    !    Self%lmix(1,j)=(xi**3)*U*Ui*g0%mats(L-j)*g0%mats(j)*g0%mats(L-j)
-    ! end do
-    ! Self%ret(1,1) = Self_gtr - Self%less(1,1)
     !
     !INITIALIZE THE GREEN'S FUNCTION G^{x=M,<,R,\lmix}
     do i=1,Lf
@@ -403,7 +318,7 @@ contains
        endif
        read(unit,*)u_,dens
        if(u_/=Ui)then
-          print*,"read_equilibrium_sigma: U_eq in "//reg(sigfile)//" different from the input:",u0
+          print*,"read_equilibrium_sigma: U_eq in "//reg(sigfile)//" different from the input:",Ui
           stop
        endif
        write(*,"(3A)")"Header of the file:",reg(txtfy(u_)),reg(txtfy(dens))
@@ -429,6 +344,14 @@ contains
 
 
 
+
+
+  subroutine neq_fft_fg()
+  end subroutine neq_fft_fg
+
+
+  subroutine neq_fft_sigma()
+  end subroutine neq_fft_sigma
 
 
   subroutine fft_extract_gtau(g,gred)

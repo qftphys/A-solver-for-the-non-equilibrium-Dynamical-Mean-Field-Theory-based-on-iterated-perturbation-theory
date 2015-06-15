@@ -1,15 +1,5 @@
 include make.inc
 
-#EXE=neqdmft_bethe_quench
-#EXE=neqdmft_bethe_dos_quench
-#EXE=neqdmft_2dsquare_quench
-EXE=neqdmft_2dsquare_field
-
-DIR=./drivers
-DIREXE= $(HOME)/.bin
-
-
-
 OBJS =  NEQ_CONTOUR.o NEQ_CONTOUR_GF.o NEQ_INPUT_VARS.o ELECTRIC_FIELD.o NEQ_THERMOSTAT.o NEQ_EQUILIBRIUM.o  NEQ_MEASURE.o NEQ_IPT.o NEQ_DMFT_IPT.o
 
 
