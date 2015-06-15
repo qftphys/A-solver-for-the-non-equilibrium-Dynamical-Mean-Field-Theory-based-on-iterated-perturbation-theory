@@ -262,12 +262,9 @@ contains
     call read_equilibrium_weiss_superc(g0,params,Hk=Hk,Wtk=Wtk)!<== get G0^{x=iw,tau,M,<,R,\lmix}
     !
     !INITIALIZE THE LOCAL GREEN'S FUNCTION Gloc^{x=M,<,R,\lmix}
-    !<TODO
-    ! this can be simplified by overloading the equality for kb_contour_gf.
-    !>TODO
     do i=1,2
        do j=1,2
-          g(i,j)=zero
+          G(i,j)=zero
        enddo
     enddo
     do ik=1,Lk
@@ -279,18 +276,18 @@ contains
        G(1,1)%less(1,1) = G(1,1)%less(1,1) + wtk(ik)*gk(1,ik)%less(1,1)
        G(1,1)%lmix(1,0:)= G(1,1)%lmix(1,0:)+ wtk(ik)*gk(1,ik)%lmix(1,0:)
        !
-       G(1,2)%mats(0:)  = G(1,2)%mats(0:)  + wtk(ik)*gk(2,ik)%mats(0:)
-       G(1,2)%tau(0:)   = G(1,2)%tau(0:)   + wtk(ik)*gk(2,ik)%tau(0:)
-       G(1,2)%iw(:)     = G(1,2)%iw(:)     + wtk(ik)*gk(2,ik)%iw(:)
-       G(1,2)%ret(1,1)  = G(1,2)%ret(1,1)  + wtk(ik)*gk(2,ik)%ret(1,1)
-       G(1,2)%less(1,1) = G(1,2)%less(1,1) + wtk(ik)*gk(2,ik)%less(1,1)
-       G(1,2)%lmix(1,0:)= G(1,2)%lmix(1,0:)+ wtk(ik)*gk(2,ik)%lmix(1,0:)
+       G(2,1)%mats(0:)  = G(2,1)%mats(0:)  + wtk(ik)*gk(2,ik)%mats(0:)
+       G(2,1)%tau(0:)   = G(2,1)%tau(0:)   + wtk(ik)*gk(2,ik)%tau(0:)
+       G(2,1)%iw(:)     = G(2,1)%iw(:)     + wtk(ik)*gk(2,ik)%iw(:)
+       G(2,1)%ret(1,1)  = G(2,1)%ret(1,1)  + wtk(ik)*gk(2,ik)%ret(1,1)
+       G(2,1)%less(1,1) = G(2,1)%less(1,1) + wtk(ik)*gk(2,ik)%less(1,1)
+       G(2,1)%lmix(1,0:)= G(2,1)%lmix(1,0:)+ wtk(ik)*gk(2,ik)%lmix(1,0:)
        !
     enddo
     !
     !Get the other two components by symmetry
     call get_bar(G(2,2),G(1,1),params)
-    call get_bar(G(2,1),G(1,2),params)
+    call get_bar(G(1,2),G(2,1),params)
     !
     return
   end subroutine neq_continue_equilibirum_superc_lattice
@@ -394,7 +391,7 @@ contains
     forall(i=0:L)Gk(1)%lmix(1,i)=-xi*Gk(1)%mats(L-i)    !get G^\lmix_k(0,tau)=xi*G_k(tau<0)=-xi*G_k(beta-tau>0)
     !
     Gk(2)%less(1,1) = -xi*Gk(2)%mats(L)                 !get G^<_k(0,0)= xi*G^M_k(0-)
-    Gk(2)%ret(1,1)  =  zero                             !get G^R_k(0,0)=-xi
+    Gk(2)%ret(1,1)  =  zero                             !get G^R_k(0,0)=0
     forall(i=0:L)Gk(2)%lmix(1,i)=-xi*Gk(2)%mats(L-i)    !get G^\lmix_k(0,tau)=xi*G_k(tau<0)=-xi*G_k(beta-tau>0)
     !
     !Construct the auxiliary Gk functions== Gk_aux
@@ -549,19 +546,6 @@ contains
     g0%ret(1,1)  = -xi
     forall(i=0:L)g0%lmix(1,i)=-xi*g0%mats(L-i)
   end subroutine read_equilibrium_weiss_normal
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   subroutine read_equilibrium_sigma_superc(self,params)
     type(kb_contour_gf)     :: self(2,2)

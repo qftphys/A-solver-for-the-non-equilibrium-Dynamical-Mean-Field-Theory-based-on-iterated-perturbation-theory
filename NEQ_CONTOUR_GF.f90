@@ -37,52 +37,55 @@ MODULE NEQ_CONTOUR_GF
 
 
   interface operator(*)
-     module procedure &
-          kb_contour_gf_scalarL_d,kb_contour_gf_scalarL_c,&
-          kb_contour_dgf_scalarL_d,kb_contour_dgf_scalarL_c,&
-          kb_contour_gf_scalarR_d,kb_contour_gf_scalarR_c,&
-          kb_contour_dgf_scalarR_d,kb_contour_dgf_scalarR_c
+     module procedure kb_contour_gf_scalarL_d
+     module procedure kb_contour_gf_scalarL_c
+     module procedure kb_contour_dgf_scalarL_d
+     module procedure kb_contour_dgf_scalarL_c
+     module procedure kb_contour_gf_scalarR_d
+     module procedure kb_contour_gf_scalarR_c
+     module procedure kb_contour_dgf_scalarR_d
+     module procedure kb_contour_dgf_scalarR_c
   end interface operator(*)
 
 
   interface assignment(=)
-     module procedure &
-          kb_contour_gf_equality_,kb_contour_dgf_equality_,&
-          kb_contour_gf_equality__,kb_contour_dgf_equality__
+     module procedure kb_contour_gf_equality_
+     module procedure kb_contour_dgf_equality_
+     module procedure kb_contour_gf_equality__
+     module procedure kb_contour_dgf_equality__
   end interface assignment(=)
 
-
   interface check_dimension_kb_contour
-     module procedure &
-          check_dimension_kb_contour_gf, &
-          check_dimension_kb_contour_gf_, &
-          check_dimension_kb_contour_dgf, &
-          check_dimension_kb_contour_dgf_
+     module procedure check_dimension_kb_contour_gf
+     module procedure check_dimension_kb_contour_gf_
+     module procedure check_dimension_kb_contour_dgf
+     module procedure check_dimension_kb_contour_dgf_
   end interface check_dimension_kb_contour
 
   interface allocate_kb_contour_gf
-     module procedure &
-          allocate_kb_contour_gf_1, &
-          allocate_kb_contour_gf_2, &
-          allocate_kb_contour_gf_4
+     module procedure allocate_kb_contour_gf_1
+     module procedure allocate_kb_contour_gf_2
+     module procedure allocate_kb_contour_gf_4
   end interface allocate_kb_contour_gf
 
   interface allocate_kb_contour_dgf
-     module procedure &
-          allocate_kb_contour_dgf_1, &
-          allocate_kb_contour_dgf_2
+     module procedure allocate_kb_contour_dgf_1
+     module procedure allocate_kb_contour_dgf_2
   end interface allocate_kb_contour_dgf
 
   interface kb_trapz
-     module procedure kb_trapz_d, kb_trapz_c
+     module procedure kb_trapz_d
+     module procedure kb_trapz_c
   end interface kb_trapz
 
   interface kb_half_trapz
-     module procedure kb_half_trapz_d, kb_half_trapz_c
+     module procedure kb_half_trapz_d
+     module procedure kb_half_trapz_c
   end interface kb_half_trapz
 
   interface add_kb_contour_gf
      module procedure add_kb_contour_gf_
+     module procedure add_kb_contour_gf_V
      module procedure add_kb_contour_dgf
      module procedure add_kb_contour_gf_d
      module procedure add_kb_contour_gf_c
@@ -93,6 +96,7 @@ MODULE NEQ_CONTOUR_GF
      module procedure vie_kb_contour_gf_delta
   end interface vie_kb_contour_gf
 
+
   public :: allocate_kb_contour_gf
   public :: allocate_kb_contour_dgf
   public :: deallocate_kb_contour_gf
@@ -100,6 +104,7 @@ MODULE NEQ_CONTOUR_GF
   !
   public :: add_kb_contour_gf
   public :: convolute_kb_contour_gf
+  public :: convolute_kb_contour_gf_recursive
   public :: convolute_kb_contour_gf_delta !to be renamed in LEFT-RIGHT multiply by delta
   public :: extrapolate_kb_contour_gf
   public :: save_kb_contour_gf
@@ -479,6 +484,36 @@ contains
     C%iw(0:)    = A%iw(0:)    + B%iw(0:)
   end subroutine  add_kb_contour_gf_
 
+  subroutine add_kb_contour_gf_V(A,C,params)
+    type(kb_contour_gf)     :: A(:)
+    type(kb_contour_gf)     :: C
+    type(kb_contour_params) :: params
+    integer                 :: i,Na,N,L
+    logical                 :: checkA,checkB,checkC
+    Na=size(A)
+    do i=1,Na
+       if(  (.not.A(i)%status) )stop "contour_gf/add_kb_contour_gf: A(i) not allocated"
+    enddo
+    if(  (.not.C%status) )stop "contour_gf/add_kb_contour_gf: A,B,C not allocated"
+    N   = params%Ntime
+    L   = params%Ntau
+    !
+    do i=1,Na
+       checkA=check_dimension_kb_contour(A(i),N,L) 
+    enddo
+    checkC=check_dimension_kb_contour(C,N,L)
+    !
+    C=zero
+    do i=1,Na
+       C%less(:,:) = C%less(:,:) + A(i)%less(:,:)
+       C%ret(:,:)  = C%ret(:,:)  + A(i)%ret(:,:)
+       C%lmix(:,0:)= C%lmix(:,0:)+ A(i)%lmix(:,0:)
+       C%mats(0:)  = C%mats(0:)  + A(i)%mats(0:)
+       C%tau(0:)   = C%tau(0:)   + A(i)%tau(0:)
+       C%iw(0:)    = C%iw(0:)    + A(i)%iw(0:)
+    enddo
+  end subroutine  add_kb_contour_gf_V
+
   subroutine add_kb_contour_dgf(A,B,C,params)
     type(kb_contour_dgf)    :: A,B,C
     type(kb_contour_params) :: params
@@ -627,10 +662,10 @@ contains
     complex(8),dimension(:),allocatable :: AxB    
     integer                             :: i,j,k,itau,jtau
     logical                             :: checkA,checkB,checkC
-
+    !
     complex(8),dimension(:,:),allocatable :: Amat,Bmat,Cmat
     integer                               :: Ntot
-
+    !
     if(  (.not.A%status).OR.&
          (.not.B%status).OR.&
          (.not.C%status))stop "contour_gf/convolute_kb_contour_gf: A,B,C not allocated"
@@ -764,6 +799,64 @@ contains
   end subroutine convolute_kb_contour_gf
 
 
+  subroutine convolute_kb_contour_gf_recursive(A,C,params,dcoeff,ccoeff)
+    type(kb_contour_gf)                 :: A(:)
+    type(kb_contour_gf)                 :: C
+    type(kb_contour_gf)                 :: Knew,Kold
+    type(kb_contour_params)             :: params
+    real(8),optional                    :: dcoeff
+    complex(8),optional                 :: ccoeff
+    integer                             :: N,L
+    real(8)                             :: dt,dtau
+    complex(8),dimension(:),allocatable :: AxB    
+    integer                             :: i,j,k,itau,jtau,Na
+    logical                             :: checkA,checkB,checkC
+    !
+    Na = size(A)
+    !
+    if(  (.not.C%status))stop "contour_gf/convolute_kb_contour_gf: C not allocated"
+    do i=1,Na
+       if(  (.not.A(i)%status))stop "contour_gf/convolute_kb_contour_gf: A(i) not allocated"
+    enddo
+    !
+    call allocate_kb_contour_gf(Knew,params)
+    call allocate_kb_contour_gf(Kold,params)
+    !
+    N   = params%Nt      !<== work with the ACTUAL size of the contour
+    L   = params%Ntau
+    dt  = params%dt
+    dtau= params%dtau
+    !
+    checkC=check_dimension_kb_contour(C,params%Ntime,L)
+    do i=1,Na
+       checkA=check_dimension_kb_contour(A(i),params%Ntime,L) 
+    enddo
+    !
+    !Perform the recursive convolution:
+    Kold = A(1)
+    do i=2,Na-1
+       call convolute_kb_contour_gf(Kold,A(i),Knew,params)
+    enddo
+    call convolute_kb_contour_gf(Knew,A(Na),C,params)
+    !
+    if(present(dcoeff))then
+       C%lmix(N,0:L) = dcoeff*C%lmix(N,0:L)
+       C%less(N,1:N-1)=dcoeff*C%less(N,1:N-1)
+       C%less(1:N,N)=dcoeff*C%less(1:N,N)
+       C%ret(N,1:N)=dcoeff*C%ret(N,1:N)
+    endif
+    if(present(ccoeff))then
+       C%lmix(N,0:L) = ccoeff*C%lmix(N,0:L)
+       C%less(N,1:N-1)=ccoeff*C%less(N,1:N-1)
+       C%less(1:N,N)=ccoeff*C%less(1:N,N)
+       C%ret(N,1:N)=ccoeff*C%ret(N,1:N)
+    endif
+    call deallocate_kb_contour_gf(Knew,params)
+    call deallocate_kb_contour_gf(Kold,params)
+    !    
+  end subroutine convolute_kb_contour_gf_recursive
+
+
   !======= CONVOLUTION WITH A FUNCTION MULTIPLIED BY THE DELTA FUNCTION======= 
   !C(t,t')=(A*B)(t,t'), with t=t_max && t'=0,t_max
   !t_max_index==N
@@ -777,8 +870,6 @@ contains
     complex(8),dimension(:),allocatable :: AxB    
     integer                             :: i,j,k,itau,jtau
     logical                             :: checkA,checkC
-
-
     if(  (.not.A%status).OR.&
          (.not.C%status))stop "contour_gf/convolute_kb_contour_gf: A,B,C not allocated"
     N   = params%Nt      !<== work with the ACTUAL size of the contour
@@ -833,7 +924,7 @@ contains
   !======= VOLTERRA INTEGRAL EQUATION ======= 
   !----------------------------------------------------------------------------
   !  This subroutine solves a Volterra integral equation of the second kind,
-  !              G(t,t')+(K*G)(t,t')=Q(t,t')
+  !              G(t,t') = Q(t,t') + (K*G)(t,t')
   !  for t=n*dt or t'=n*dt, using 2^nd *implicit* Runge-Kutta method.
   !----------------------------------------------------------------------------
   subroutine vie_kb_contour_gf_q(Q,K,G,params)

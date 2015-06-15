@@ -156,7 +156,6 @@ contains
     integer                 :: unit
     logical                 :: check
     integer                 :: Ntime,Ntau,Niw
-    real(8)                 :: dt,beta
     if(params%status)stop "neq_contour/read_kb_contour_params: Contour already allocated"
     inquire(file=reg(file),exist=check)
     if(.not.check)stop "neq_contour/read_kb_contour_params: file does not exist"
