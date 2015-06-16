@@ -16,10 +16,10 @@ LIBDIR=/opt
 
 ##$ CHOOSE THE MODEL BY SELECTING THE PROGRAM DRIVER
 #EXE=neqdmft_bethe_quench
-EXE=neqdmft_bethe_dos_quench
+#EXE=neqdmft_bethe_dos_quench
 #EXE=neqdmft_2dsquare_quench
 #EXE=neqdmft_2dsquare_field
-
+EXE=neqdmft_attractive_bethe_dos_quench
 
 ##$ SET THE LOCATION OF YOU PROGRAM DRIVER (default is ./drivers)
 DIR =drivers

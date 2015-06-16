@@ -22,6 +22,7 @@ MODULE NEQ_INPUT_VARS
   real(8)                 :: Ui            !equilibrium local interaction
   real(8)                 :: U             !non-equilibrium local interaction
   real(8)                 :: xmu           !chemical potential (shifted by Uloc/2)
+  real(8)                 :: deltasc             !breaking symmetry field
   real(8)                 :: Vbath         !coupling to the Thermostat
   integer                 :: Lbath         !number of frequency in the bash DOS
   real(8)                 :: Wbath         !Width of the BATH DOS
@@ -63,6 +64,7 @@ contains
     call parse_input_variable(Ui         , "Ui" , inputFILE , default         =0d0 , comment="equilibrium local interaction")
     call parse_input_variable(U          , "U" , inputFILE , default          =1d0 , comment="non-equilibrium local interaction")
     call parse_input_variable(xmu        , "XMU" , inputFILE , default        =0.d0 , comment="chemical potential")
+    call parse_input_variable(deltasc    , "DELTASC",inputFILE,default        =0.02d0 ,comment="Value of the SC symmetry breaking term.")
     call parse_input_variable(eps        , "EPS" , inputFILE , default        =0.01d0 , comment="broadening")
     call parse_input_variable(nloop      , "NLOOP" , inputFILE , default      =30 , comment="Max number of DMFT loop")
     call parse_input_variable(dmft_error , "DMFT_ERROR" , inputFILE , default =1.d-3 , comment="DMFT convergence threshold")

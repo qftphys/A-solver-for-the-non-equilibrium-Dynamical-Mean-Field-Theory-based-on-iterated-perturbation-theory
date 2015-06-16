@@ -143,8 +143,8 @@ program neqDMFT
         !PERFORM THE SELF_CONSISTENCY: get local GF + update Weiss-Field
         !===================================================================================================================!
         !  solve KBE for the auxiliary functions:
-        Gedge(1)=zero
-        Gedge(2)=zero
+        call del_kb_contour_gf(Gloc(1,1),cc_params)
+        call del_kb_contour_gf(Gloc(2,1),cc_params)
         do ik=1,Lk
            ! solve a VIDE for g11k: id/dt gk = delta_cc + hk_11*gk + K*gk; K=Sigma(1,1)
            call vide_kb_contour_gf( Ham(:,ik),Sigma(1,1),Gk_aux(1,ik),dGk_aux_old(1,ik),dGk_aux(1,ik),cc_params)
@@ -152,27 +152,14 @@ program neqDMFT
            call vide_kb_contour_gf(-Ham(:,ik),Sigma(2,2),Gk_aux(2,ik),dGk_aux_old(2,ik),dGk_aux(2,ik),cc_params)
            ! solve a VIE for G(1,1;k) and a convolution to get G(2,1;k)
            ! G(1,1;k) = gk + Ker*G(1,1;k) ; Ker = gk * Sigma(1,2) * fbark * Sigma(2,1)
-           call convolute_kb_contour_gf_recursive( [Gk_aux(1,ik),Sigma(1,2),Gk_aux(2,ik),Sigma(2,1)],Kerk,params)
+           call convolute_kb_contour_gf( [Gk_aux(1,ik),Sigma(1,2),Gk_aux(2,ik),Sigma(2,1)],Kerk,cc_params)
            call vie_kb_contour_gf(gk_aux(1,ik),Kerk,Gk(1,ik),cc_params)
            ! G(2,1;k) = fbark * Sigma(2,1) * G(1,1;k)
-           call convolute_kb_contour_gf_recursive( [Gk_aux(2,ik),Sigma(2,1),Gk(1,ik)] ,Gk(2,ik),params)
-           !
-           !Sum over K the G(1,1,k) & G(2,1;k) to get G(1,1) & G(2,1)
-           Gedge(1)%ret(1:itime) = Gedge(1)%ret(1:itime)  + wt(ik)*Gk(1,ik)%ret(itime,1:itime)
-           Gedge(1)%less(1:itime)= Gedge(1)%less(1:itime) + wt(ik)*Gk(1,ik)%less(itime,1:itime)
-           Gedge(1)%lmix(0:)     = Gedge(1)%lmix(0:)      + wt(ik)*Gk(1,ik)%lmix(itime,0:)
-           Gedge(2)%ret(1:itime) = Gedge(2)%ret(1:itime)  + wt(ik)*Gk(2,ik)%ret(itime,1:itime)
-           Gedge(2)%less(1:itime)= Gedge(2)%less(1:itime) + wt(ik)*Gk(2,ik)%less(itime,1:itime)
-           Gedge(2)%lmix(0:)     = Gedge(2)%lmix(0:)      + wt(ik)*Gk(2,ik)%lmix(itime,0:)
+           call convolute_kb_contour_gf( [Gk_aux(2,ik),Sigma(2,1),Gk(1,ik)] ,Gk(2,ik),cc_params)
         enddo
-        Gloc(1,1)%ret(itime,1:itime)   = Gedge(1)%ret(1:itime)
-        Gloc(1,1)%less(itime,1:itime)  = Gedge(1)%less(1:itime)
-        Gloc(1,1)%lmix(itime,0:)       = Gedge(1)%lmix(0:)
-        Gloc(1,1)%less(1:itime-1,itime)=-conjg(Gedge(1)%less(1:itime-1))
-        Gloc(2,1)%ret(itime,1:itime)   = Gedge(2)%ret(1:itime)
-        Gloc(2,1)%less(itime,1:itime)  = Gedge(2)%less(1:itime)
-        Gloc(2,1)%lmix(itime,0:)       = Gedge(2)%lmix(0:)
-        Gloc(2,1)%less(1:itime-1,itime)= Gedge(1)%less(1:itime-1)+Gedge(2)%ret(1:itime-1)
+        !Sum over K the G(1,1,k) & G(2,1;k) to get G(1,1) & G(2,1)
+        call sum_kb_contour_gf(Gk(1,:),wt(:),Gloc(1,1),cc_params)
+        call sum_kb_contour_gf(Gk(2,:),wt(:),Gloc(2,1),cc_params)
         !get the other components of G: G(2,2)<--G(1,1); G(1,2)<--G(2,1)
         call get_bar(Gloc(2,2),Gloc(1,1),cc_params)
         call get_bar(Gloc(1,2),Gloc(2,1),cc_params)
@@ -186,42 +173,42 @@ program neqDMFT
         ! fbar0 = 11 - K*fbar0 ; K=G(2,2)*Sigma(2,2) + G(2,1)*Sigma(1,2)
         call convolute_kb_contour_gf(Gloc(1,1),SigmaReg(1,1),Ker0(1),cc_params)
         call convolute_kb_contour_gf(Gloc(1,2),SigmaReg(2,1),Ker0(2),cc_params)
-        call add_kb_contour_gf(Ker0(1),Ker0(2),Kerk,cc_params)
+        call sum_kb_contour_gf(Ker0(1),1d0,Ker0(2),1d0,Kerk,cc_params)
         call vie_kb_contour_gf(Kerk,g0aux(1),cc_params)
         !
         call convolute_kb_contour_gf(Gloc(2,2),SigmaReg(2,2),Ker0(1),cc_params)
         call convolute_kb_contour_gf(Gloc(2,1),SigmaReg(1,2),Ker0(2),cc_params)
-        call add_kb_contour_gf(Ker0(1),Ker0(2),Kerk,cc_params)
+        call sum_kb_contour_gf(Ker0(1),1d0,Ker0(2),1d0,Kerk,cc_params)
         call vie_kb_contour_gf(Kerk,g0aux(2),cc_params)
         !
         ! Solve VIE for G0(1,1): G0(1,1) = K1 + K2*G0(1,1)
         ! K1 = g0*G - g0*G*S*fbar0*Fbar - g0*F*Sigmabar*fbar0*Fbar
         ! K1 = Ker1(1) + Ker1(2) + Ker1(3)
         call convolute_kb_contour_gf( g0aux(1),Gloc(1,1),Ker1(1),cc_params)
-        call convolute_kb_contour_gf_recursive( [K_gamma(1),SigmaReg(1,2),G0aux(2),Gloc(2,1)]        , Ker1(2), cc_params,dcoeff=-1d0)
-        call convolute_kb_contour_gf_recursive( [G0aux(1),Gloc(1,2),SigmaReg(2,2),G0aux(2),Gloc(2,1)], Ker1(3), cc_params,dcoeff=-1d0)
-        call add_kb_contour_gf(Ker1(1:3),Ker(1),cc_params)
+        call convolute_kb_contour_gf( [Ker1(1),SigmaReg(1,2),G0aux(2),Gloc(2,1)]           , Ker1(2), cc_params)
+        call convolute_kb_contour_gf( [G0aux(1),Gloc(1,2),SigmaReg(2,2),G0aux(2),Gloc(2,1)], Ker1(3), cc_params)
+        call sum_kb_contour_gf(Ker1(1:3),[1d0,-1d0,-1d0],Ker(1),cc_params)
         !
         ! K2 = g0*G*S*fbar0*Fbar*Sigma + g0*F*Sigmabar*fbar0*Fbar*Sigma +  g0*G*S*fbar0*Gbar*Sbar    +  g0*F*Sigmabar*fbar0*Gbar*Sbar
         ! K2 = Ker2(1)                 + Ker2(2)                        +  Ker2(3)                   +  Ker2(4)
         ! K2 = Ker1(2)*Sigma           + Ker1(3)*Sigma                  +  Ker1(1)*S*fbar0*Gbar*Sbar +  g0*F*Sigmabar*fbar0*Gbar*Sbar
         ! K2 = K_gamma(5) + K_delta(5) + K_epsi(1)*Sbar + K_zeta(1)*Sbar
         ! K2 = K_gamma(5) + K_delta(5) + K_epsi(2) + K_zeta(2)
-        call convolute_kb_contour_gf(Ker1(2),Sigma(1,1),Ker2(1),cc_params,dcoeff=-1d0)
-        call convolute_kb_contour_gf(Ker1(3),Sigma(1,1),Ker2(2),cc_params,dcoeff=-1d0)
-        call convolute_kb_contour_gf_recursive([Ker1(1),SigmaReg(1,2),G0aux(2),Gloc(2,2),Sigma(2,1)]           ,Ker2(3),cc_params)
-        call convolute_kb_contour_gf_recursive([g0aux(1),Gloc(1,2),SigmaReg(2,2),g0aux(2),Gloc(2,2),Sigma(2,1)],Ker2(4),cc_params)
-        call add_kb_contour_gf(Ker2(1:4),Ker(2),cc_params)
+        call convolute_kb_contour_gf(Ker1(2),Sigma(1,1),Ker2(1),cc_params)
+        call convolute_kb_contour_gf(Ker1(3),Sigma(1,1),Ker2(2),cc_params)
+        call convolute_kb_contour_gf([Ker1(1),SigmaReg(1,2),G0aux(2),Gloc(2,2),Sigma(2,1)]           ,Ker2(3),cc_params)
+        call convolute_kb_contour_gf([g0aux(1),Gloc(1,2),SigmaReg(2,2),g0aux(2),Gloc(2,2),Sigma(2,1)],Ker2(4),cc_params)
+        call sum_kb_contour_gf(Ker2(1:4),[1d0,1d0,1d0,1d0],Ker(2),cc_params)
         !
         call vie_kb_contour_gf(Ker(1),Ker(2),Gwf(1,1),cc_params)
         !
         ! Solve for G0(2,1) : 
         ! G0(2,1)=F0bar= f0bar*Fbar - f0bar*Fbar*Sigma*G0 - f0bar*Gbar*Sbar*G0
-        ! G0(2,1)=F0bar= Ker1(1)    - Ker1(3)             - Ker1(3)
+        ! G0(2,1)=F0bar= Ker1(1)    - Ker1(2)             - Ker1(3)
         call convolute_kb_contour_gf(G0aux(2),Gloc(2,1),Ker1(1),cc_params)
-        call convolute_kb_contour_gf_recursive( [G0aux(2),Gloc(2,1),Sigma(1,1),Gwf(1,1)] ,Ker1(2),cc_params)
-        call convolute_kb_contour_gf_recursive( [G0aux(2),Gloc(2,2),Sigma(2,1),Gwf(1,1)] ,Ker1(3),cc_params)
-        call add_kb_contour_gf( Ker1(1:3), Gwf(2,1), cc_params)
+        call convolute_kb_contour_gf( [G0aux(2),Gloc(2,1),Sigma(1,1),Gwf(1,1)] ,Ker1(2),cc_params)
+        call convolute_kb_contour_gf( [G0aux(2),Gloc(2,2),Sigma(2,1),Gwf(1,1)] ,Ker1(3),cc_params)
+        call sum_kb_contour_gf( Ker1(1:3), [1d0,-1d0,-1d0], Gwf(2,1), cc_params)
         !
         ! get the other components using symmetries:
         call get_bar(Gwf(2,2),Gwf(1,1),cc_params)

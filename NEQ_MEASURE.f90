@@ -118,7 +118,7 @@ contains
     docc = measure_docc_superc(g,self,params)
     delta= measure_delta(g(1,2),params)
     epot = measure_epot(dens,docc,params)
-    ekin = measure_ekin_hk(Gk(1,1),Hk,Wtk,params)
+    ekin = measure_ekin_hk(Gk(1,:),Hk,Wtk,params)
     write(unit,"(6F20.12)")params%t(itime),dens,delta,docc,epot,ekin,ekin+epot
     close(unit)
   end subroutine measure_observables_superc
@@ -132,103 +132,9 @@ contains
 
 
 
-  !+-------------------------------------------------------------------+
-  !PURPOSE: return the value of the kinetic energy at a given istant of time
-  !Lattice: -i\sum_ks epsik(k,t)G_k(t,t)= 2*\sum_k e(k,t)n(k,t)
-  !Bethe: E_k(t)=2*Im[G^R*G^< + G^<*G^A + G^\lmix*G^\rmix](t,t)
-  !+-------------------------------------------------------------------+
-  function measure_ekin_hk(Gk,Hk,Wtk,params) result(ekin)
-    type(kb_contour_gf),dimension(:)    :: gk
-    complex(8),dimension(:,:)           :: Hk
-    real(8),dimension(:)                :: Wtk
-    type(kb_contour_params)             :: params
-    real(8)                             :: Ekin
-    integer                             :: i,ik,Lk,N
-    complex(8),dimension(:),allocatable :: Ker
-    real(8)                             :: nkt
-    N  = params%Nt
-    Lk = size(Gk)
-    if(size(Hk,1)<params%Ntime)stop "measure_ekin: size(Hk),1 is not Ntime"
-    if(size(Hk,2)<Lk)          stop "measure_ekin: size(Hk),2 is not Lk"
-    if(size(Wtk)<Lk)           stop "measure_ekin: size(Wt),1 is not Lk"
-    !
-    Ekin=0d0
-    do ik=1,Lk
-       Nkt  = dimag(Gk(ik)%less(N,N))
-       Ekin = Ekin + 2d0*Wtk(ik)*Nkt*Hk(N,ik)
-    enddo
-  end function measure_ekin_hk
-
-  function measure_ekin_bethe(g,params) result(ekin)
-    type(kb_contour_gf)                 :: g
-    type(kb_contour_params)             :: params
-    real(8)                             :: ekin
-    integer                             :: i,k,j,N,L
-    complex(8),dimension(:),allocatable :: Ker
-    real(8)                             :: nt
-    N = params%Nt
-    L = params%Ntau
-    !
-    allocate(Ker(0:max(N,L)))
-    if(N==1)then
-       do k=0,L
-          Ker(k)=G%mats(L-k)*G%mats(k)
-       end do
-       ekin = -2.d0*params%dtau*kb_trapz(Ker(0:),0,L)
-    else
-       do k=0,L
-          Ker(k)=G%lmix(N,k)*conjg(G%lmix(N,L-k))
-       end do
-       ekin=2.d0*params%dtau*dimag( (-xi)*kb_trapz(Ker(0:),0,L) )
-       do k=1,N
-          Ker(k)=G%ret(N,k)*G%less(k,N)
-       end do
-       ekin=ekin + 2.d0*params%dt*dimag(kb_trapz(Ker(0:),1,N))
-       do k=1,N
-          Ker(k)=G%less(N,k)*conjg(G%ret(N,k))
-       end do
-       ekin=ekin + 2.d0*params%dt*dimag(kb_trapz(Ker(0:),1,N))
-    endif
-    deallocate(Ker)
-  end function measure_ekin_bethe
 
 
 
-
-
-
-  !+-------------------------------------------------------------------+
-  !PURPOSE: measure current
-  !+-------------------------------------------------------------------+
-  subroutine measure_current(Gk,Vkt,Wtk,params)
-    type(kb_contour_gf)            :: gk(:)
-    real(8),dimension(:,:,:)       :: Vkt
-    real(8),dimension(:)           :: wtk
-    type(kb_contour_params)        :: params
-    integer                        :: unit,itime,Lk,ik,i
-    real(8),dimension(size(Vkt,3)) :: Jloc
-    real(8)                        :: nkt
-    !
-    Lk=size(gk)
-    itime = params%Nt
-    !
-    if(size(Vkt,1)<params%Ntime)stop "neq_measure_current: dim(Vkt,2) < Ntime"
-    if(size(Vkt,2)/=Lk)stop "neq_measure_current: dim(Vkt,3) != Lk"
-    !
-    unit = free_unit()
-    open(unit,file="current.info")
-    write(unit,"(8A20)")"time","Jx","Jy","Jz"
-    close(unit)
-    !
-    open(unit,file="current.neqipt",position="append")
-    Jloc=0d0
-    do ik=1,Lk
-       nkt  = dimag(Gk(ik)%less(itime,itime))
-       Jloc = Jloc + Wtk(ik)*Nkt*Vkt(itime,ik,:)
-    enddo
-    write(unit,"(4F20.12)")params%t(itime),(Jloc(i),i=1,size(Jloc))
-    close(unit)
-  end subroutine measure_current
 
 
 
@@ -356,6 +262,106 @@ contains
 
 
 
+
+  !+-------------------------------------------------------------------+
+  !PURPOSE: measure current
+  !+-------------------------------------------------------------------+
+  subroutine measure_current(Gk,Vkt,Wtk,params)
+    type(kb_contour_gf)            :: gk(:)
+    real(8),dimension(:,:,:)       :: Vkt
+    real(8),dimension(:)           :: wtk
+    type(kb_contour_params)        :: params
+    integer                        :: unit,itime,Lk,ik,i
+    real(8),dimension(size(Vkt,3)) :: Jloc
+    real(8)                        :: nkt
+    !
+    Lk=size(gk)
+    itime = params%Nt
+    !
+    if(size(Vkt,1)<params%Ntime)stop "neq_measure_current: dim(Vkt,2) < Ntime"
+    if(size(Vkt,2)/=Lk)stop "neq_measure_current: dim(Vkt,3) != Lk"
+    !
+    unit = free_unit()
+    open(unit,file="current.info")
+    write(unit,"(8A20)")"time","Jx","Jy","Jz"
+    close(unit)
+    !
+    open(unit,file="current.neqipt",position="append")
+    Jloc=0d0
+    do ik=1,Lk
+       nkt  = dimag(Gk(ik)%less(itime,itime))
+       Jloc = Jloc + Wtk(ik)*Nkt*Vkt(itime,ik,:)
+    enddo
+    write(unit,"(4F20.12)")params%t(itime),(Jloc(i),i=1,size(Jloc))
+    close(unit)
+  end subroutine measure_current
+
+
+
+
+  !+-------------------------------------------------------------------+
+  !PURPOSE: return the value of the kinetic energy at a given istant of time
+  !Lattice: -i\sum_ks epsik(k,t)G_k(t,t)= 2*\sum_k e(k,t)n(k,t)
+  !Bethe: E_k(t)=2*Im[G^R*G^< + G^<*G^A + G^\lmix*G^\rmix](t,t)
+  !+-------------------------------------------------------------------+
+  function measure_ekin_hk(Gk,Hk,Wtk,params) result(ekin)
+    type(kb_contour_gf),dimension(:)    :: gk
+    complex(8),dimension(:,:)           :: Hk
+    real(8),dimension(:)                :: Wtk
+    type(kb_contour_params)             :: params
+    real(8)                             :: Ekin
+    integer                             :: i,ik,Lk,N
+    complex(8),dimension(:),allocatable :: Ker
+    real(8)                             :: nkt
+    N  = params%Nt
+    Lk = size(Gk)
+    if(size(Hk,1)<params%Ntime)stop "measure_ekin: size(Hk),1 is not Ntime"
+    if(size(Hk,2)<Lk)          stop "measure_ekin: size(Hk),2 is not Lk"
+    if(size(Wtk)<Lk)           stop "measure_ekin: size(Wt),1 is not Lk"
+    !
+    Ekin=0d0
+    do ik=1,Lk
+       Nkt  = dimag(Gk(ik)%less(N,N))
+       Ekin = Ekin + 2d0*Wtk(ik)*Nkt*Hk(N,ik)
+    enddo
+  end function measure_ekin_hk
+
+  function measure_ekin_bethe(g,params) result(ekin)
+    type(kb_contour_gf)                 :: g
+    type(kb_contour_params)             :: params
+    real(8)                             :: ekin
+    integer                             :: i,k,j,N,L
+    complex(8),dimension(:),allocatable :: Ker
+    real(8)                             :: nt
+    N = params%Nt
+    L = params%Ntau
+    !
+    allocate(Ker(0:max(N,L)))
+    if(N==1)then
+       do k=0,L
+          Ker(k)=G%mats(L-k)*G%mats(k)
+       end do
+       ekin = -2.d0*params%dtau*kb_trapz(Ker(0:),0,L)
+    else
+       do k=0,L
+          Ker(k)=G%lmix(N,k)*conjg(G%lmix(N,L-k))
+       end do
+       ekin=2.d0*params%dtau*dimag( (-xi)*kb_trapz(Ker(0:),0,L) )
+       do k=1,N
+          Ker(k)=G%ret(N,k)*G%less(k,N)
+       end do
+       ekin=ekin + 2.d0*params%dt*dimag(kb_trapz(Ker(0:),1,N))
+       do k=1,N
+          Ker(k)=G%less(N,k)*conjg(G%ret(N,k))
+       end do
+       ekin=ekin + 2.d0*params%dt*dimag(kb_trapz(Ker(0:),1,N))
+    endif
+    deallocate(Ker)
+  end function measure_ekin_bethe
+
+
+
+
   !+-------------------------------------------------------------------+
   !PURPOSE: return the value of the kinetic energy at a given istant of time
   ! U(t)= U*docc(t) - n(t) + 1/4
@@ -370,11 +376,11 @@ contains
     L = params%Ntau
     !
     if(N==1)then
-       nt   = measure_dens(g,self,params)
+       nt   = measure_dens(g,params)
        docc = measure_docc(g,self,params)
        epot = abs(Ui)*(docc - nt + 0.25d0)
     else
-       nt   = measure_dens(g,self,params)
+       nt   = measure_dens(g,params)
        docc = measure_docc(g,self,params)
        epot = abs(U)*(docc - nt + 0.25d0)
     endif
@@ -391,11 +397,11 @@ contains
     L = params%Ntau
     !
     if(N==1)then
-       nt   = measure_dens(g(1,1),self(1,1),params)
+       nt   = measure_dens(g(1,1),params)
        docc = measure_docc(g,self,params)
        epot = abs(Ui)*(docc - nt + 0.25d0)
     else
-       nt   = measure_dens(g(1,1),self(1,1),params)
+       nt   = measure_dens(g(1,1),params)
        docc = measure_docc(g,self,params)
        epot = abs(U)*(docc - nt + 0.25d0)
     endif

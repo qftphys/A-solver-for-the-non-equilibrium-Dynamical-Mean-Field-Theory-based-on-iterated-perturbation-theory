@@ -14,17 +14,15 @@ module NEQ_EQUILIBRIUM
      module procedure neq_continue_equilibirum_normal_lattice
      module procedure neq_continue_equilibirum_normal_bethe
      module procedure neq_continue_equilibirum_superc_lattice
-     module procedure neq_continue_equilibirum_superc_bethe
   end interface neq_continue_equilibirum
 
+  interface neq_setup_initial_conditions
+     module procedure neq_setup_initial_conditions_normal
+     module procedure neq_setup_initial_conditions_superc
+  end interface neq_setup_initial_conditions
 
   public  :: neq_continue_equilibirum     ! read G0 and continue the equilibrium GF,Sigma,G0 to the t=0 contour.
   public  :: neq_setup_initial_conditions ! setup the initial conditions for the e/k dependent GF.
-
-
-  ! public :: read_equilibrium_weiss
-  ! public :: read_equilibrium_sigma
-  ! public :: fft_extract_gtau
 
   real(8),public :: h1,h2,hDC,dens
 
@@ -64,43 +62,9 @@ contains
     !
     !INITIALIZE THE SELF-ENERGY SELF^{x=M,<,R,\lmix}
     call read_equilibrium_sigma_normal(self,params)            !<== get Sigma^{x=iw,tau,M,<,R,\lmix}
-    ! ! !(this step depends on the imp. solv.)
-    ! ! ! self^M(0,0) = -*U0*U0*G0(tau)*G0(-tau)*G0(tau)
-    ! ! ! self^<(0,0) = i^3*U*U*G0(0-)*G0(0+)*G0(0-)
-    ! ! ! self^>(0,0) = i^3*U*U*G0(0+)*G0(0-)*G0(0+)
-    ! ! ! self^\lmix(0,t) = i^3*U*U0*G0(-t)*G0(t)*G0(-t)
-    ! ! ! self^R(0,0) = self^> - self^<
-    ! ! do j=0,Lf
-    ! !    self%tau(j) = Ui*Ui*g0%tau(j)*g0%tau(Lf-j)*g0%tau(j)
-    ! ! end do
-    ! ! call extract_gtau_(self%tau,self%mats)
-    ! ! ! Scoeff  = tail_coeff_sigma(Ui,0.5d0)
-    ! ! call fft_sigma_tau2iw(self%iw,self%tau(0:),beta)!Scoeff)
-    ! ! if(Ui==0d0)self%iw=zero
-    ! ! Self%iw = xi*dimag(self%iw)                                   !imposing half-filling symmetry
-    ! ! ! Self%less(1,1)=(xi**3)*U*U*g0%mats(L)*g0%mats(0)*g0%mats(L)
-    ! ! ! Self_gtr      =(xi**3)*U*U*g0%mats(0)*g0%mats(L)*g0%mats(0)
-    ! ! ! Self%ret(1,1) = Self_gtr - Self%less(1,1)
-    ! ! ! do j=0,L
-    ! ! !    Self%lmix(1,j)=(xi**3)*U*Ui*g0%mats(L-j)*g0%mats(j)*g0%mats(L-j)
-    ! ! ! end do
-    ! Scoeff  = tail_coeff_sigma(Ui,dens)
-    ! call fft_sigma_iw2tau(self%iw,self%tau,beta,Scoeff)
-    ! call extract_gtau_(self%tau,self%mats)
-    ! if(Ui==0d0)self%tau=0d0
-    ! if(Ui==0d0)self%mats=0d0
-    ! self%less(1,1) = -xi*self%mats(L)                  !OK
-    ! self%ret(1,1) =   xi*(self%mats(L)-self%mats(0))   !OK
-    ! forall(i=0:L)self%lmix(1,i)=-xi*self%mats(L-i)     !small errors near 0,beta
     !
     !INITIALIZE THE WEISS FIELD G0^{x=M,<,R,\lmix}
     call read_equilibrium_weiss_normal(g0,params,Hk=Hk,Wtk=Wtk)!<== get G0^{x=iw,tau,M,<,R,\lmix}
-    ! Gcoeff = tail_coeff_glat(Ui,h1,h2,hDC)
-    ! call fft_gf_iw2tau(g0%iw,g0%tau(0:),params%beta,Gcoeff)
-    ! call extract_gtau_(g0%tau,g0%mats)
-    ! g0%less(1,1) = -xi*g0%mats(L)
-    ! g0%ret(1,1)  = -xi
-    ! forall(i=0:L)g0%lmix(1,i)=-xi*g0%mats(L-i)
     !
     !INITIALIZE THE LOCAL GREEN'S FUNCTION Gloc^{x=M,<,R,\lmix}
     G=zero
@@ -143,33 +107,9 @@ contains
     !
     !INITIALIZE THE SELF-ENERGY SELF^{x=M,<,R,\lmix}
     call read_equilibrium_sigma_normal(self,params)            !<== get Sigma^{x=iw,tau,M,<,R,\lmix}
-    ! !(this step depends on the imp. solv.)
-    ! ! self^M(0,0) = -*U0*U0*G0(tau)*G0(-tau)*G0(tau)
-    ! ! self^<(0,0) = i^3*U*U*G0(0-)*G0(0+)*G0(0-)
-    ! ! self^>(0,0) = i^3*U*U*G0(0+)*G0(0-)*G0(0+)
-    ! ! self^\lmix(0,t) = i^3*U*U0*G0(-t)*G0(t)*G0(-t)
-    ! ! self^R(0,0) = self^> - self^<
-    ! do j=0,L
-    !    Self%mats(j) = Ui*Ui*g0%mats(j)*g0%mats(L-j)*g0%mats(j)
-    ! end do
-    ! Scoeff  = tail_coeff_sigma(Ui,0.5d0)
-    ! call fft_sigma_tau2iw(Self%iw,Self%mats(0:),beta,Scoeff)
-    ! Self%iw = xi*dimag(self%iw) !!ACTHUNG: imposing half-filling symmetry
-    ! Self%less(1,1)=(xi**3)*U*U*g0%mats(L)*g0%mats(0)*g0%mats(L)
-    ! Self_gtr      =(xi**3)*U*U*g0%mats(0)*g0%mats(L)*g0%mats(0)
-    ! do j=0,L
-    !    Self%lmix(1,j)=(xi**3)*U*Ui*g0%mats(L-j)*g0%mats(j)*g0%mats(L-j)
-    ! end do
-    ! Self%ret(1,1) = Self_gtr - Self%less(1,1)
     !
     !CHECK IF G0(IW) IS AVAILABLE OR START FROM THE NON-INTERACTING SOLUTION
     call read_equilibrium_weiss_normal(g0,params,wband=wband)!<== get G0^{x=iw,tau,M,<,R,\lmix}
-    ! !INITIALIZE THE WEISS FIELD G0^{x=M,<,R,\lmix}
-    ! Gcoeff = tail_coeff_glat(U,0.5d0,0d0,0d0)
-    ! call fft_gf_iw2tau(g0%iw,g0%mats(0:),params%beta,Gcoeff)
-    ! g0%less(1,1) = -xi*g0%mats(L)
-    ! g0%ret(1,1)  = -xi
-    ! forall(i=0:L)g0%lmix(1,i)=-xi*g0%mats(L-i)
     !
     !INITIALIZE THE GREEN'S FUNCTION G^{x=M,<,R,\lmix}
     do i=1,Lf
@@ -363,7 +303,7 @@ contains
     real(8)                             :: Hk
     type(kb_contour_params)             :: params
     integer                             :: i,j,k,L,Lf
-    real(8)                             :: nk
+    real(8)                             :: nk,det
     complex(8)                          :: epsk,zita
     complex(8),allocatable,dimension(:) :: SxG
     real(8),dimension(:),allocatable    :: ftau
@@ -446,13 +386,13 @@ contains
        i = file_length(trim(sigfile)) - 1
        open(unit,file=trim(sigfile),status='old')
        if(i/=Lf)then
-          print*,"read_equilibrium_sigma: Liw in "//reg(sigfile)//" different from the input:",Lf
+          print*,"read_equilibrium_sigma: Liw in "//reg(sigfile)//" different from the input:"//reg(txtfy(Lf))
           print*,"read_equilibrium_sigma: check the header of the file u_i, <n>"
           stop
        endif
        read(unit,*)u_,dens
        if(u_/=Ui)then
-          print*,"read_equilibrium_sigma: U_eq in "//reg(sigfile)//" different from the input:",u0
+          print*,"read_equilibrium_sigma: U_eq in "//reg(sigfile)//" different from the input:",Ui
           stop
        endif
        write(*,"(3A)")"Header of the file:",reg(txtfy(u_)),reg(txtfy(dens))
@@ -550,7 +490,7 @@ contains
   subroutine read_equilibrium_sigma_superc(self,params)
     type(kb_contour_gf)     :: self(2,2)
     type(kb_contour_params) :: params
-    real(8)                 :: wm,res,ims
+    real(8)                 :: wm,res,ims,delta
     logical                 :: bool
     complex(8)              :: zeta
     integer                 :: i,j,k,ik,unit,len,N,L,Lf
@@ -573,16 +513,23 @@ contains
        unit = free_unit()
        i = file_length(trim(sigfile))
        open(unit,file=trim(sigfile),status='old')
-       if(i/=Lf)stop "read_equilibrium_sigma: Liw in "//reg(sigfile)//" different from the input:",Lf
+       if(i/=Lf)then
+          print*,"read_equilibrium_sigma: Liw in "//reg(sigfile)//" different from the input:",Lf
+          stop
+       endif
        do i=1,Lf
           read(unit,*)wm,ims,res
           self(1,1)%iw(i) = dcmplx(res,ims)
        enddo
        close(unit)
+       call fft_sigma_iw2tau(self(1,1)%iw,self(1,1)%tau(0:),beta) !,C=[0d0,0d0])
+       call fft_extract_gtau(self(1,1)%tau(0:),self(1,1)%mats(0:))
     else
        write(*,"(A)")"Start from Non-interacting/Hartree-Fock Sigma(iw)=Ui*(n-1/2)"
        dens=0.5d0
        self(1,1)%iw = Ui*(dens-0.5d0)    !set self-energy to zero or whatever is the initial HF solution
+       self(1,1)%tau=0d0
+       self(1,1)%mats=0d0
     endif
     !ANOMAL COMPONENT
     inquire(file=trim(selfile),exist=bool)
@@ -591,26 +538,29 @@ contains
        unit = free_unit()
        i = file_length(trim(selfile))
        open(unit,file=trim(selfile),status='old')
-       if(i/=Lf)stop "read_equilibrium_sigma: Liw in "//reg(selfile)//" different from the input:",Lf
+       if(i/=Lf)then
+          print*,"read_equilibrium_sigma: Liw in "//reg(selfile)//" different from the input:",Lf
+          stop
+       endif
        do i=1,Lf
           read(unit,*)wm,ims,res
           self(1,2)%iw(i) = dcmplx(res,ims)
        enddo
        close(unit)
+       call fft_sigma_iw2tau(self(1,2)%iw,self(1,2)%tau(0:),beta) !,C=[0d0,0d0])
+       call fft_extract_gtau(self(1,2)%tau(0:),self(1,2)%mats(0:))
     else
        write(*,"(A)")"Start from Non-interacting/Hartree-Fock Self(iw)=-Delta_SC"
        delta = deltasc
        self(1,2)%iw = -delta    !set self-energy to zero or whatever is the initial HF solution
+
     endif
     !
-    call fft_sigma_iw2tau(self(1,1)%iw,self(1,1)%tau(0:),beta) !,C=[0d0,0d0])
-    call fft_sigma_iw2tau(self(1,2)%iw,self(1,2)%tau(0:),beta) !,C=[0d0,0d0])
-    call fft_extract_gtau(self(1,1)%tau(0:),self(1,1)%mats(0:))
-    call fft_extract_gtau(self(1,2)%tau(0:),self(1,2)%mats(0:))
-    if(Ui==0d0)self(1,1)%tau=0d0
-    if(Ui==0d0)self(1,2)%tau=0d0
-    if(Ui==0d0)self(1,1)%mats=0d0
-    if(Ui==0d0)self(1,2)%mats=0d0
+
+    if(deltasc==0d0)then        !<=== if(delta_sc==0) then (Ui==0)
+       self(1,2)%tau=0d0
+       self(1,2)%mats=0d0
+    endif
     !ACTHUNG BABY:
     self(1,1)%less(1,1) = -xi*self(1,1)%mats(L) !OK
     self(1,1)%ret(1,1) =   xi*(self(1,1)%mats(L)-self(1,1)%mats(0))   !OK
@@ -632,12 +582,12 @@ contains
     real(8),optional        :: Wtk(size(Hk))
     real(8),optional        :: wband
     real(8)                 :: wband_
-    real(8)                 :: wm,res,ims,mu
+    real(8)                 :: wm,res,ims,mu,det
     logical                 :: bool
     complex(8)              :: zeta
     integer                 :: i,j,k,ik,unit,len,N,L,Lf,Lk
     real(8)                 :: Gcoeff(4)
-    real(8),allocatable  :: Wt,Epsik
+    real(8),allocatable  :: Wt(:),Epsik(:)
     !
     wband_=1d0;if(present(wband))wband_=wband
     !
@@ -661,10 +611,13 @@ contains
        unit = free_unit()
        i = file_length(trim(g0file))
        open(unit,file=trim(g0file),status='old')
-       if(i/=Lf)stop "read_equilibrium_weiss: Liw in "//reg(g0file)//" different from the input:",Lf
+       if(i/=Lf) then
+          print*, "read_equilibrium_weiss: Liw in "//reg(g0file)//" different from the input:",Lf
+          stop
+       endif
        do i=1,Lf
           read(unit,*)wm,ims,res
-          g0%iw(i) = dcmplx(res,ims)
+          g0(1,1)%iw(i) = dcmplx(res,ims)
        enddo
        close(unit)
     else
@@ -702,7 +655,10 @@ contains
        unit = free_unit()
        i = file_length(trim(f0file))
        open(unit,file=trim(f0file),status='old')
-       if(i/=Lf)stop "read_equilibrium_weiss: Liw in "//reg(f0file)//" different from the input:",Lf
+       if(i/=Lf)then
+          print*, "read_equilibrium_weiss: Liw in "//reg(f0file)//" different from the input:",Lf
+          stop
+       endif
        do i=1,Lf
           read(unit,*)wm,ims,res
           g0(1,2)%iw(i) = dcmplx(res,ims)
