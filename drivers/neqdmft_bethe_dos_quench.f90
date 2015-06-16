@@ -110,8 +110,8 @@ program neqDMFT
         call del_kb_contour_gf(Gloc,cc_params)
         do ik=1,Lk
            call vide_kb_contour_gf(Ham(:,ik),Sigma,Gk(ik),dGk_old(ik),dGk(ik),cc_params)
-           call sum_kb_contour_gf(Gloc,1d0,Gk(ik),wt(ik),Gloc,cc_params)
         enddo
+        call sum_kb_contour_gf(Gk(:),wt(:),Gloc,cc_params)
 
         !update the weiss field by solving the integral equation:
         ! G0  = Q + K*G0 , with K = -G*\Sigma and Q = G
@@ -121,7 +121,6 @@ program neqDMFT
         !CHECK CONVERGENCE
         converged = convergence_check(Gwf,cc_params)
      enddo
-
 
 
      !EVALUATE AND PRINT THE RESULTS OF THE CALCULATION
