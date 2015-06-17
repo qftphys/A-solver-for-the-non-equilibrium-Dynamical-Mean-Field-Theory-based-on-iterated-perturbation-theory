@@ -5,9 +5,30 @@ module NEQ_IPT
   implicit none
   private
 
+  public  :: neq_solve_hf
   public  :: neq_solve_ipt
 
 contains
+
+
+  !+-------------------------------------------------------------------+
+  !PURPOSE  : Solve with the 2^nd IPT sigma functions
+  !+-------------------------------------------------------------------+
+  subroutine neq_solve_hf(G,SigmaHF,params)
+    type(kb_contour_gf)     :: G
+    complex(8),dimension(:) :: SigmaHF
+    type(kb_contour_params) :: params
+    real(8)                 :: Nt
+    integer                 :: N,L
+    !
+    N   = params%Nt                 !<== work with the ACTUAL size of the contour
+    L   = params%Ntau
+    !
+    if(size(SigmaHF)/=params%Ntime)stop "neq_solve_hf error: size(sigmaHF)!=Ntime"
+    nt = dimag(G%less(N,N))
+    SigmaHF = U*(nt-0.5d0)
+  end subroutine neq_solve_hf
+
 
 
   !+-------------------------------------------------------------------+
@@ -48,7 +69,7 @@ contains
     !Imaginary time edge:
     forall(i=0:L)Sigma%lmix(N,i)  = U*Ui*G0%lmix(N,i)*G0_rmix(i,N)*G0%lmix(N,i)
     forall(j=1:N)Sigma%ret(N,j) = Sigma_gtr(N,j) - Sigma%less(N,j)
-
+    !
   end subroutine neq_solve_ipt
 
 

@@ -1,11 +1,5 @@
 program neqDMFT
   USE NEQ_DMFT_IPT
-  ! USE NEQ_CONTOUR
-  ! USE NEQ_CONTOUR_GF
-  ! USE NEQ_VARS_GLOBAL
-  ! USE NEQ_AUX_FUNX
-  ! USE NEQ_MEASURE
-  ! USE NEQ_IPT
   USE SCIFOR
   USE DMFT_TOOLS
   implicit none
@@ -14,7 +8,12 @@ program neqDMFT
   real(8)                               :: wband
   character(len=16)                     :: finput
   type(kb_contour_gf)                   :: Sbath
-  type(kb_contour_gf)                   :: Gloc,Sigma,Gwf
+  type(kb_contour_gf)                   :: Gloc
+  type(kb_contour_gf)                   :: Gwf
+  type(kb_contour_gf)                   :: Sigma
+  type(kb_contour_gf)                   :: SigmaReg
+  complex(8),dimension(:),allocatable   :: SigmaHF
+  !
   type(kb_contour_gf)                   :: Ker
   type(kb_contour_gf),allocatable       :: Gk(:)
   type(kb_contour_dgf),allocatable      :: dGk(:),dGk_old(:)
@@ -24,6 +23,7 @@ program neqDMFT
   real(8),dimension(:),allocatable      :: epsik,wt
   real(8),dimension(:,:),allocatable    :: nk
   real(8)                               :: D,de,intwt
+
 
   !READ THE INPUT FILE (in vars_global):
   call parse_cmd_variable(finput,"FINPUT",default='inputNEQ.conf')
@@ -50,6 +50,8 @@ program neqDMFT
 
 
   !ALLOCATE ALL THE FUNCTIONS INVOLVED IN THE CALCULATION:
+  allocate(SigmaHF(cc_params%Ntime)) !Self-Energy function (Hartree-Fock term)
+  call allocate_kb_contour_gf(SigmaReg,cc_params) !Self-Energy function (Regular or 2nd-order term)
   call allocate_kb_contour_gf(Sigma,cc_params) !Self-Energy function
   call allocate_kb_contour_gf(Gloc,cc_params)  !Local Green's function
   call allocate_kb_contour_gf(Gwf,cc_params)   !Local Weiss-Field function
@@ -59,9 +61,6 @@ program neqDMFT
      call allocate_kb_contour_gf(Gk(ik),cc_params)
      call allocate_kb_contour_dgf(dGk(ik),cc_params)
      call allocate_kb_contour_dgf(dGk_old(ik),cc_params)
-     Gk(ik)=zero
-     dGk(ik)=zero
-     dGk_old(ik)=zero
   end do
   allocate(ham(cc_params%Ntime,Lk))
   allocate(nk(cc_params%Ntime,Lk))
@@ -71,7 +70,7 @@ program neqDMFT
   !READ OR GUESS THE INITIAL WEISS FIELD G0 (t=t'=0)
   cc_params%Nt=1
   Gloc = zero
-  call neq_continue_equilibirum(Gwf,Gk,dGk,Gloc,Sigma,epsik,wt,cc_params)
+  call neq_continue_equilibirum(Gwf,Gk,dGk,Gloc,SigmaHF,SigmaReg,Sigma,epsik,wt,cc_params)
   call measure_observables(Gloc,Sigma,cc_params)
   do ik=1,Lk
      nk(1,ik)=dimag(Gk(ik)%less(1,1))
@@ -82,8 +81,6 @@ program neqDMFT
      enddo
   enddo
 
-
-
   !START THE TIME_STEP LOOP  1<t<=Nt
   !AT EACH TIME_STEP PERFORM A FULL DMFT CALCULATION:
   do itime=2,cc_params%Ntime
@@ -92,6 +89,7 @@ program neqDMFT
      cc_params%Nt=itime
      !prepare the weiss-field at this actual time_step for DMFT:
      call  extrapolate_kb_contour_gf(Gwf,cc_params)
+     call  extrapolate_kb_contour_gf(Gloc,cc_params)
      do ik=1,Lk
         dGk_old(ik) = dGk(ik)
      enddo
@@ -103,25 +101,25 @@ program neqDMFT
         write(*,"(A,I4,A1)",advance='no')"dmft loop=",iloop," "
 
         !IMPURITY SOLVER: IPT.
-        !GET SIGMA FROM THE WEISS FIELD
-        call neq_solve_ipt(Gwf,Sigma,cc_params)
+        !call neq_solve_hf(Gloc,SigmaHF,cc_params)
+        sigmaHF(itime) = zero
+        call neq_solve_ipt(Gwf,SigmaReg,cc_params)
+        call sum_kb_contour_gf(SigmaReg,1d0,SigmaHF,1d0,Sigma,cc_params)
 
         !PERFORM THE SELF_CONSISTENCY: get local GF + update Weiss-Field
-        call del_kb_contour_gf(Gloc,cc_params)
         do ik=1,Lk
-           call vide_kb_contour_gf(Ham(:,ik),Sigma,Gk(ik),dGk_old(ik),dGk(ik),cc_params)
+           call vide_kb_contour_gf(Ham(:,ik)+SigmaHF(:),SigmaReg,Gk(ik),dGk_old(ik),dGk(ik),cc_params)
         enddo
         call sum_kb_contour_gf(Gk(:),wt(:),Gloc,cc_params)
 
         !update the weiss field by solving the integral equation:
         ! G0  = Q + K*G0 , with K = -G*\Sigma and Q = G
-        call convolute_kb_contour_gf(Gloc,Sigma,Ker,cc_params,dcoeff=-1.d0)
+        call convolute_kb_contour_gf(Gloc,SigmaReg,Ker,cc_params,dcoeff=-1.d0)
         call vie_kb_contour_gf(Gloc,Ker,Gwf,cc_params)
         !
         !CHECK CONVERGENCE
         converged = convergence_check(Gwf,cc_params)
      enddo
-
 
      !EVALUATE AND PRINT THE RESULTS OF THE CALCULATION
      call measure_observables(Gloc,Sigma,cc_params)

@@ -13,7 +13,6 @@ MODULE NEQ_CONTOUR_GF
      complex(8),dimension(:,:),allocatable :: ret
      complex(8),dimension(:,:),allocatable :: lmix
      real(8),dimension(:),allocatable      :: mats
-     real(8),dimension(:),allocatable      :: tau
      complex(8),dimension(:),allocatable   :: iw
      logical                               :: status=.false.
      logical                               :: anomalous=.false.
@@ -21,6 +20,11 @@ MODULE NEQ_CONTOUR_GF
      integer                               :: L=0
      integer                               :: LF=0
   end type kb_contour_gf
+  !
+  type,public :: kb_contour_sigma
+     type(kb_contour_gf)                   :: self
+     complex(8),dimension(:),allocatable   :: hfb
+  end type kb_contour_sigma
   !
   !
   !
@@ -188,7 +192,6 @@ contains
     allocate(G%ret(N,N))   ; G%ret=zero
     allocate(G%lmix(N,0:L)); G%lmix=zero
     allocate(G%mats(0:L))  ; G%mats=0d0
-    allocate(G%tau(0:Lf))  ; G%tau=0d0
     allocate(G%iw(Lf))     ; G%iw=zero
     G%status=.true.
   end subroutine allocate_kb_contour_gf_main
@@ -261,7 +264,7 @@ contains
   subroutine deallocate_kb_contour_gf(G)
     type(kb_contour_gf) :: G
     if(.not.G%status)stop "contour_gf/deallocate_kb_contour_gf: G not allocated"
-    deallocate(G%less,G%ret,G%lmix,G%mats,G%tau,G%iw)
+    deallocate(G%less,G%ret,G%lmix,G%mats,G%iw)
     G%N=0
     G%L=0
     G%Lf=0
@@ -376,7 +379,6 @@ contains
     call store_data(reg(file)//"_ret.data.neqipt", G%ret(:,:))
     call store_data(reg(file)//"_lmix.data.neqipt",G%lmix(:,0:))
     call store_data(reg(file)//"_mats.data.neqipt",G%mats(0:))
-    call store_data(reg(file)//"_tau.data.neqipt",G%tau(0:))
     call store_data(reg(file)//"_iw.data.neqipt",G%iw(:))
   end subroutine save_kb_contour_gf
   !
@@ -414,7 +416,6 @@ contains
     call read_data(trim(file)//"_ret.data.neqipt",G%ret(:,:))
     call read_data(trim(file)//"_lmix.data.neqipt",G%lmix(:,0:))
     call read_data(trim(file)//"_mats.data.neqipt",G%mats(0:))
-    call read_data(trim(file)//"_tau.data.neqipt",G%tau(0:))
     call read_data(trim(file)//"_iw.data.neqipt",G%iw(:))
   end subroutine read_kb_contour_gf
   !
@@ -519,8 +520,7 @@ contains
     C%ret(:,:)  = A%ret(:,:)  + B%ret(:,:)
     C%lmix(:,0:)= A%lmix(:,0:)+ B%lmix(:,0:)
     C%mats(0:)  = A%mats(0:)  + B%mats(0:)
-    C%tau(0:)   = A%tau(0:)   + B%tau(0:)
-    C%iw(0:)    = A%iw(0:)    + B%iw(0:)
+    C%iw(:)    = A%iw(:)    + B%iw(:)
   end subroutine  add_kb_contour_gf_simple
 
   subroutine add_kb_contour_gf_recursive(A,C,params)
@@ -549,8 +549,7 @@ contains
        C%ret(:,:)  = C%ret(:,:)  + A(i)%ret(:,:)
        C%lmix(:,0:)= C%lmix(:,0:)+ A(i)%lmix(:,0:)
        C%mats(0:)  = C%mats(0:)  + A(i)%mats(0:)
-       C%tau(0:)   = C%tau(0:)   + A(i)%tau(0:)
-       C%iw(0:)    = C%iw(0:)    + A(i)%iw(0:)
+       C%iw(:)     = C%iw(:)    + A(i)%iw(:)
     enddo
   end subroutine  add_kb_contour_gf_recursive
 
@@ -591,8 +590,7 @@ contains
     C%ret(:,:)  = A%ret(:,:)
     C%lmix(:,0:)= A%lmix(:,0:)
     C%mats(0:)  = A%mats(0:)
-    C%tau(0:)   = A%tau(0:)
-    C%iw(0:)    = A%iw(0:)
+    C%iw(:)     = A%iw(:) + B(1)
     !
     do i=1,N
        C%ret(i,i) = C%ret(i,i) + B(i)
@@ -618,8 +616,7 @@ contains
     C%ret(:,:)  = A%ret(:,:)
     C%lmix(:,0:)= A%lmix(:,0:)
     C%mats(0:)  = A%mats(0:)
-    C%tau(0:)   = A%tau(0:)
-    C%iw(0:)    = A%iw(0:)
+    C%iw(:)     = A%iw(:) + B(1)
     !
     do i=1,N
        C%ret(i,i) = C%ret(i,i) + B(i)
@@ -653,6 +650,11 @@ contains
     N   = params%Nt   !<== work with the ACTUAL size of the contour
     L   = params%Ntau
     !
+    if(N==1)then
+       C%mats(0:) = ak*A%mats(0:) + bk*B%mats(0:)
+       C%iw(:)    = ak*A%iw(:)    + bk*B%iw(:)
+    endif
+    !
     C%ret(N,1:N)   = ak*A%ret(N,1:N)   + bk*B%ret(N,1:N)
     C%less(N,1:N)  = ak*A%less(N,1:N)  + bk*B%less(N,1:N)
     C%lmix(N,0:)   = ak*A%lmix(N,0:)   + bk*B%lmix(N,0:)
@@ -678,6 +680,14 @@ contains
     N   = params%Nt   !<== work with the ACTUAL size of the contour
     L   = params%Ntau
     !
+    call del_kb_contour_gf(C,params)
+    !
+    if(N==1)then 
+       C%mats(0)  = ak*A%mats(0)  + B(1)
+       C%mats(1:) = ak*A%mats(1:)
+       C%iw(:)    = ak*A%iw(:)    + B(1)
+    endif
+    !
     C%ret(N,1:N)   = ak*A%ret(N,1:N)
     C%less(N,1:N)  = ak*A%less(N,1:N)
     C%lmix(N,0:)   = ak*A%lmix(N,0:)
@@ -689,7 +699,6 @@ contains
     endif
     !
     C%ret(N,N) = C%ret(N,N) + B(N)
-    C%mats(0) = C%mats(0) + B(1)
     !
   end subroutine sum_kb_contour_gf_delta_d
 
@@ -706,6 +715,14 @@ contains
     N   = params%Nt   !<== work with the ACTUAL size of the contour
     L   = params%Ntau
     !
+    call del_kb_contour_gf(C,params)
+    !
+    if(N==1)then 
+       C%mats(0)  = ak*A%mats(0)  + B(1)
+       C%mats(1:) = ak*A%mats(1:)
+       C%iw(:)    = ak*A%iw(:)    + B(1)
+    endif
+    !
     C%ret(N,1:N)   = ak*A%ret(N,1:N)
     C%less(N,1:N)  = ak*A%less(N,1:N)
     C%lmix(N,0:)   = ak*A%lmix(N,0:)
@@ -721,12 +738,16 @@ contains
     !
   end subroutine sum_kb_contour_gf_delta_c
 
-  subroutine sum_kb_contour_gf_recursive(A,ak,C,params)
+  subroutine sum_kb_contour_gf_recursive(A,ak,C,params,iaddup)
     type(kb_contour_gf)               :: A(:)
     real(8)                           :: ak(size(A))
     type(kb_contour_gf),intent(inout) :: C
     type(kb_contour_params)           :: params
     integer                           :: N,L,Na,i
+    logical,optional                  :: iaddup
+    logical                           :: iaddup_
+    !
+    iaddup_=.false.;if(present(iaddup))iaddup_=iaddup
     !
     Na=size(A)
     !
@@ -737,6 +758,15 @@ contains
     !
     N   = params%Nt   !<== work with the ACTUAL size of the contour
     L   = params%Ntau
+    !
+    if(.not.iaddup_)call del_kb_contour_gf(C,params)
+    !
+    if(N==1)then
+       do i=1,Na
+          C%mats(0:) = C%mats(0:) + ak(i)*A(i)%mats(0:)
+          C%iw(:)    = C%iw(:)    + ak(i)*A(i)%iw(:)
+       enddo
+    endif
     !
     do i=1,Na
        C%ret(N,1:N)   = C%ret(N,1:N)  + ak(i)*A(i)%ret(N,1:N)
@@ -758,12 +788,6 @@ contains
 
 
 
-
-
-
-
-
-
   !======= DEL ======= 
   ! reset the function along the actual perimeter to zero:
   subroutine del_kb_contour_gf(G,params)
@@ -775,6 +799,11 @@ contains
     !
     N   = params%Nt   !<== work with the ACTUAL size of the contour
     L   = params%Ntau
+    !
+    if(N==1)then
+       G%iw = zero
+       G%mats = 0d0
+    endif
     !
     G%ret(N,1:N)   = zero
     G%less(N,1:N)  = zero
@@ -795,6 +824,20 @@ contains
     dG%ret(1:N)  = zero
     dG%lmix(0:)  = zero
   end subroutine del_kb_contour_dgf
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1628,7 +1671,6 @@ contains
     G1%ret(:,:)   = C
     G1%lmix(:,0:) = C
     G1%mats(0:)   = C
-    G1%tau(0:)    = C
     G1%iw(:)      = C
   end subroutine kb_contour_gf_equality_
   !
@@ -1639,7 +1681,6 @@ contains
     G1%ret(:,:)   = G2%ret(:,:)
     G1%lmix(:,0:) = G2%lmix(:,0:)
     G1%mats(0:)   = G2%mats(0:)
-    G1%tau(0:)    = G2%tau(0:)
     G1%iw(:)      = G2%iw(:)
   end subroutine kb_contour_gf_equality__
   !
@@ -1669,7 +1710,6 @@ contains
     F%ret(:,:)  = C*G%ret(:,:)
     F%lmix(:,0:)= C*G%lmix(:,0:)
     F%mats(0:)  = C*G%mats(0:)
-    F%tau(0:)   = C*G%tau(0:)
     F%iw(:)     = C*G%iw(:)
   end function kb_contour_gf_scalarL_d
   !
@@ -1716,7 +1756,6 @@ contains
     F%ret(:,:)  = G%ret(:,:)*C
     F%lmix(:,0:)= G%lmix(:,0:)*C
     F%mats(0:)  = G%mats(0:)*C
-    F%tau(0:)   = G%tau(0:)*C
     F%iw(:)     = G%iw(:)*C
   end function kb_contour_gf_scalarR_d
   !
@@ -1740,7 +1779,6 @@ contains
     F%ret(:,:)  = G%ret(:,:)*C
     F%lmix(:,0:)= G%lmix(:,0:)*C
     F%mats(0:)  = G%mats(0:)*C
-    F%tau(0:)   = G%tau(0:)*C
     F%iw(:)     = G%iw(:)*C
   end function kb_contour_gf_scalarR_c
   !
@@ -1827,10 +1865,8 @@ contains
        ! Matsubara imaginary time component
        if (.not.B%anomalous) then
           A%mats(0:L) = B%mats(L:0:-1)
-          A%tau(0:Lf) = B%tau(Lf:0:-1)
        else
           A%mats(0:L) = B%mats(0:L)
-          A%tau(0:Lf) = B%tau(0:Lf)
        endif
        !
        ! Matsubara frequencies component
