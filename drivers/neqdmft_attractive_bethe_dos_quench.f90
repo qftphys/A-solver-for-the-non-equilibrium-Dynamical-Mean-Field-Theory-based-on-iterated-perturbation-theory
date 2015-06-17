@@ -3,24 +3,25 @@ program neqDMFT
   USE SCIFOR
   USE DMFT_TOOLS
   implicit none
-  integer                               :: i,j,ik,itime,iloop,ix,iy,Lk
-  logical                               :: converged
-  real(8)                               :: wband
-  character(len=16)                     :: finput
-  type(kb_contour_gf)                   :: Sbath
-  type(kb_contour_gf),dimension(2,2)    :: Gloc,SigmaReg,Sigma,Gwf
-  type(kb_contour_gf)                   :: Kerk,Ker0(2),Ker1(3),Ker2(4),Ker(2)
-  type(kb_contour_gf)                   :: G0aux(2)
-  type(kb_contour_gf),allocatable       :: Gk(:,:),Gk_aux(:,:)
-  type(kb_contour_dgf),allocatable      :: dGk_aux(:,:),dGk_aux_old(:,:)
-  type(kb_contour_dgf),dimension(2)     :: Gedge,G0edge
-  complex(8),dimension(:,:),allocatable :: Ham
-  real(8),dimension(:),allocatable      :: Delta
-  complex(8)                            :: sigma_gtr
+  integer                                 :: i,j,ik,itime,iloop,ix,iy,Lk
+  logical                                 :: converged
+  real(8)                                 :: wband
+  character(len=16)                       :: finput
+  type(kb_contour_gf),dimension(2,2)      :: Gloc,Gwf
+  type(kb_contour_gf),dimension(2,2)      :: Sigma
+  type(kb_contour_gf),dimension(2,2)      :: SigmaReg
+  complex(8),dimension(:,:,:),allocatable :: SigmaHFB
+  !
+  type(kb_contour_gf)                     :: Kerk,Ker0(2),Ker1(3),Ker2(4),Ker(2)
+  type(kb_contour_gf)                     :: G0aux(2)
+  type(kb_contour_gf),allocatable         :: Gk(:,:),Gk_aux(:,:)
+  type(kb_contour_dgf),allocatable        :: dGk_aux(:,:),dGk_aux_old(:,:)
+  complex(8),dimension(:,:),allocatable   :: Ham
+  real(8),dimension(:),allocatable        :: Delta,nt
   !RESULTS:
-  real(8),dimension(:),allocatable      :: epsik,wt
-  real(8),dimension(:,:),allocatable    :: nk
-  real(8)                               :: D,de,intwt
+  real(8),dimension(:),allocatable        :: epsik,wt
+  real(8),dimension(:,:),allocatable      :: nk
+  real(8)                                 :: D,de,intwt
 
   !READ THE INPUT FILE (in vars_global):
   call parse_cmd_variable(finput,"FINPUT",default='inputNEQ.conf')
@@ -47,6 +48,8 @@ program neqDMFT
 
 
   !ALLOCATE ALL THE FUNCTIONS INVOLVED IN THE CALCULATION:
+  allocate(SigmaHFB(2,2,cc_params%Ntime)) !Self-Energy function (Hartree-Fock-Bogoliubov term)
+  call allocate_kb_contour_gf(SigmaReg,cc_params) !Self-Energy function (Regular or 2nd-order term)
   call allocate_kb_contour_gf(Sigma,cc_params) !Self-Energy function
   call allocate_kb_contour_gf(Gloc,cc_params)  !Local Green's function
   call allocate_kb_contour_gf(Gwf,cc_params)   !Local Weiss-Field function
@@ -62,7 +65,6 @@ program neqDMFT
   do i=1,4
      call allocate_kb_contour_gf(Ker2(i),cc_params)
   enddo
-  call allocate_kb_contour_dgf(Gedge,cc_params)
   !
   allocate(Gk(2,Lk))
   allocate(Gk_aux(2,Lk))
@@ -77,11 +79,14 @@ program neqDMFT
   allocate(ham(cc_params%Ntime,Lk))
   allocate(nk(cc_params%Ntime,Lk))
   allocate(Delta(cc_params%Ntime))
+  allocate(nt(cc_params%Ntime))
 
 
   !READ OR GUESS THE INITIAL WEISS FIELD G0 (t=t'=0)
   cc_params%Nt=1
-  call neq_continue_equilibirum(Gwf,Gk,Gk_aux,dGk_aux,Gloc,Sigma,epsik,wt,cc_params)
+  call neq_continue_equilibirum(Gwf,Gk,Gk_aux,dGk_aux,Gloc,SigmaHFB,SigmaReg,Sigma,epsik,wt,cc_params)
+  call measure_observables(Gloc,Sigma,Gk,Ham,Wt,cc_params)
+  Delta(1) = measure_delta(Gloc(1,2),cc_params)
   do ik=1,Lk
      nk(1,ik)=dimag(Gk(1,ik)%less(1,1))
   enddo
@@ -90,11 +95,6 @@ program neqDMFT
         ham(i,ik)=epsik(ik)
      enddo
   enddo
-  Delta(1) = dimag(Gloc(1,2)%less(1,1))
-  call measure_observables(Gloc,Sigma,Gk,Ham,Wt,cc_params)
-
-
-
 
 
 
@@ -107,10 +107,10 @@ program neqDMFT
      !
      !
      !prepare the weiss-field at this actual time_step for DMFT:
-     !===================================================================================================================!
      do i=1,2
         do j=1,2
            call extrapolate_kb_contour_gf(Gwf(i,j),cc_params)
+           call extrapolate_kb_contour_gf(Gloc(i,j),cc_params)
         enddo
      enddo
      do i=1,2
@@ -122,7 +122,6 @@ program neqDMFT
      !
      !
      !DMFT LOOP:
-     !===================================================================================================================!
      iloop=0;converged=.false.
      do while(.not.converged.AND.iloop<nloop)
         iloop=iloop+1
@@ -131,36 +130,40 @@ program neqDMFT
         !
         !
         !IMPURITY SOLVER: IPT.
-        !===================================================================================================================!
-        !GET REGULAR/2nd ORDER TERM OF SIGMA FROM THE WEISS FIELDS
-        call neq_solve_ipt(Gwf,SigmaReg,cc_params)
-        !BUILD THE COMPLETE SELF-ENERGY (w/ THE HFB TERMS)
-        call add_kb_contour_gf(SigmaReg(1,2),-Delta(:),Sigma(1,2),cc_params) !Sigma_12 = -Delta + Sigma^(2)_12 = H_(HFB,12) + Sigma^(2)_12
-        call add_kb_contour_gf(SigmaReg(2,1),-Delta(:),Sigma(2,1),cc_params)
+        !call neq_solve_hfb(Gloc,SigmaHFB,cc_params)
+        nt(itime)   =measure_dens(Gloc(1,1),cc_params)
+        delta(itime)=measure_delta(Gloc(1,2),cc_params)
+        SigmaHFB(1,1,itime)=zero
+        SigmaHFB(1,2,itime)=-delta(itime)
+        SigmaHFB(2,1,itime)=-delta(itime)
+        SigmaHFB(2,2,itime)=zero
+        !get regular/2nd order term of sigma from the weiss fields
+        !call neq_solve_ipt(Gwf,SigmaReg,cc_params)
+        SigmaReg=zero
+        call sum_kb_contour_gf(SigmaReg(1,1),1d0,SigmaHFB(1,1,:),1d0,Sigma(1,1),cc_params)
+        call sum_kb_contour_gf(SigmaReg(1,2),1d0,SigmaHFB(1,2,:),1d0,Sigma(1,2),cc_params)
+        call sum_kb_contour_gf(SigmaReg(2,1),1d0,SigmaHFB(2,1,:),1d0,Sigma(2,1),cc_params)
+        call sum_kb_contour_gf(SigmaReg(2,2),1d0,SigmaHFB(2,2,:),1d0,Sigma(2,2),cc_params)
         !
         !
         !
         !PERFORM THE SELF_CONSISTENCY: get local GF + update Weiss-Field
-        !===================================================================================================================!
-        !  solve KBE for the auxiliary functions:
-        call del_kb_contour_gf(Gloc(1,1),cc_params)
-        call del_kb_contour_gf(Gloc(2,1),cc_params)
+        !solve KBE for the auxiliary functions:
         do ik=1,Lk
            ! solve a VIDE for g11k: id/dt gk = delta_cc + hk_11*gk + K*gk; K=Sigma(1,1)
-           call vide_kb_contour_gf( Ham(:,ik),Sigma(1,1),Gk_aux(1,ik),dGk_aux_old(1,ik),dGk_aux(1,ik),cc_params)
            ! solve a VIDE for f21k=>g22k: id/dt fbark = delta_cc + hk_12*fbark + K*fbark; K=Sigma(2,2)
-           call vide_kb_contour_gf(-Ham(:,ik),Sigma(2,2),Gk_aux(2,ik),dGk_aux_old(2,ik),dGk_aux(2,ik),cc_params)
+           call vide_kb_contour_gf( Ham(:,ik)+SigmaHFB(1,1,:),SigmaReg(1,1),Gk_aux(1,ik),dGk_aux_old(1,ik),dGk_aux(1,ik),cc_params)
+           call vide_kb_contour_gf(-Ham(:,ik)+SigmaHFB(2,2,:),SigmaReg(2,2),Gk_aux(2,ik),dGk_aux_old(2,ik),dGk_aux(2,ik),cc_params)
            ! solve a VIE for G(1,1;k) and a convolution to get G(2,1;k)
-           ! G(1,1;k) = gk + Ker*G(1,1;k) ; Ker = gk * Sigma(1,2) * fbark * Sigma(2,1)
+           ! Ker      = gk * Sigma(1,2) * fbark * Sigma(2,1)
+           ! G(1,1;k) = gk + Ker*G(1,1;k) 
+           ! G(2,1;k) = fbark * Sigma(2,1) * G(1,1;k)
            call convolute_kb_contour_gf( [Gk_aux(1,ik),Sigma(1,2),Gk_aux(2,ik),Sigma(2,1)],Kerk,cc_params)
            call vie_kb_contour_gf(gk_aux(1,ik),Kerk,Gk(1,ik),cc_params)
-           ! G(2,1;k) = fbark * Sigma(2,1) * G(1,1;k)
            call convolute_kb_contour_gf( [Gk_aux(2,ik),Sigma(2,1),Gk(1,ik)] ,Gk(2,ik),cc_params)
         enddo
-        !Sum over K the G(1,1,k) & G(2,1;k) to get G(1,1) & G(2,1)
         call sum_kb_contour_gf(Gk(1,:),wt(:),Gloc(1,1),cc_params)
         call sum_kb_contour_gf(Gk(2,:),wt(:),Gloc(2,1),cc_params)
-        !get the other components of G: G(2,2)<--G(1,1); G(1,2)<--G(2,1)
         call get_bar(Gloc(2,2),Gloc(1,1),cc_params)
         call get_bar(Gloc(1,2),Gloc(2,1),cc_params)
         !
@@ -169,8 +172,8 @@ program neqDMFT
         ! SOLVE FOR THE WEISS FIELDS: G0(1,1) & G0(2,1):
         !===================================================================================================================!
         ! solve the VIE for auxiliary weiss fields g0,fbar0
-        ! g0    = 11 - K*g0    ; K=G(1,1)*Sigma(1,1) + G(1,2)*Sigma(2,1)
-        ! fbar0 = 11 - K*fbar0 ; K=G(2,2)*Sigma(2,2) + G(2,1)*Sigma(1,2)
+        ! g0    = 11 - K*g0    ; K=G(1,1)*SigmaReg(1,1) + G(1,2)*SigmaReg(2,1)
+        ! fbar0 = 11 - K*fbar0 ; K=G(2,2)*SigmaReg(2,2) + G(2,1)*SigmaReg(1,2)
         call convolute_kb_contour_gf(Gloc(1,1),SigmaReg(1,1),Ker0(1),cc_params)
         call convolute_kb_contour_gf(Gloc(1,2),SigmaReg(2,1),Ker0(2),cc_params)
         call sum_kb_contour_gf(Ker0(1),1d0,Ker0(2),1d0,Kerk,cc_params)
@@ -182,7 +185,7 @@ program neqDMFT
         call vie_kb_contour_gf(Kerk,g0aux(2),cc_params)
         !
         ! Solve VIE for G0(1,1): G0(1,1) = K1 + K2*G0(1,1)
-        ! K1 = g0*G - g0*G*S*fbar0*Fbar - g0*F*Sigmabar*fbar0*Fbar
+        ! K1 = g0*G - g0*G*Sreg*fbar0*Fbar - g0*F*SigmaRegbar*fbar0*Fbar
         ! K1 = Ker1(1) + Ker1(2) + Ker1(3)
         call convolute_kb_contour_gf( g0aux(1),Gloc(1,1),Ker1(1),cc_params)
         call convolute_kb_contour_gf( [Ker1(1),SigmaReg(1,2),G0aux(2),Gloc(2,1)]           , Ker1(2), cc_params)

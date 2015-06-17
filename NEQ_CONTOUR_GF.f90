@@ -13,7 +13,6 @@ MODULE NEQ_CONTOUR_GF
      complex(8),dimension(:,:),allocatable :: ret
      complex(8),dimension(:,:),allocatable :: lmix
      real(8),dimension(:),allocatable      :: mats
-     real(8),dimension(:),allocatable      :: tau
      complex(8),dimension(:),allocatable   :: iw
      logical                               :: status=.false.
      logical                               :: anomalous=.false.
@@ -21,8 +20,14 @@ MODULE NEQ_CONTOUR_GF
      integer                               :: L=0
      integer                               :: LF=0
   end type kb_contour_gf
-
-
+  !
+  type,public :: kb_contour_sigma
+     type(kb_contour_gf)                   :: self
+     complex(8),dimension(:),allocatable   :: hfb
+  end type kb_contour_sigma
+  !
+  !
+  !
   ! KADANOFF-BAYM CONTOUR GREEN'S FUNCTIONS DERIVATIVE
   !====================================================
   type,public :: kb_contour_dgf
@@ -34,8 +39,112 @@ MODULE NEQ_CONTOUR_GF
      integer                             :: N=0
      integer                             :: L=0
   end type kb_contour_dgf
-
-
+  !
+  !
+  !
+  !
+  !ALLOCATION ROUTINES:
+  interface allocate_kb_contour_gf
+     module procedure allocate_kb_contour_gf_main
+     module procedure allocate_kb_contour_gf_nambu_redux
+     module procedure allocate_kb_contour_gf_nambu
+  end interface allocate_kb_contour_gf
+  !
+  interface allocate_kb_contour_dgf
+     module procedure allocate_kb_contour_dgf_main
+     module procedure allocate_kb_contour_dgf_nambu_redux
+  end interface allocate_kb_contour_dgf
+  !
+  public :: allocate_kb_contour_gf
+  public :: allocate_kb_contour_dgf
+  !
+  !
+  !DEALLOCATION ROUTINES:
+  public :: deallocate_kb_contour_gf
+  public :: deallocate_kb_contour_dgf
+  !
+  !
+  !CHECK DIMENSIONS:
+  interface check_dimension_kb_contour
+     module procedure check_dimension_kb_contour_gf
+     module procedure check_dimension_kb_contour_gf_
+     module procedure check_dimension_kb_contour_dgf
+     module procedure check_dimension_kb_contour_dgf_
+  end interface check_dimension_kb_contour
+  public :: check_dimension_kb_contour
+  !
+  !
+  !ADD (TOTAL DOMAIN) ROUTINES:
+  interface add_kb_contour_gf
+     module procedure add_kb_contour_gf_simple
+     module procedure add_kb_contour_gf_recursive
+     module procedure add_kb_contour_gf_delta_d
+     module procedure add_kb_contour_gf_delta_c
+  end interface add_kb_contour_gf
+  public :: add_kb_contour_gf
+  !
+  !
+  !SUM (PERIMETER) ROUTINES:
+  interface sum_kb_contour_gf
+     module procedure sum_kb_contour_gf_simple
+     module procedure sum_kb_contour_gf_delta_d
+     module procedure sum_kb_contour_gf_delta_c
+     module procedure sum_kb_contour_gf_recursive
+  end interface sum_kb_contour_gf
+  public :: sum_kb_contour_gf
+  !
+  !
+  !DELETE (RESET PERIMETER) ROUTINES:
+  public :: del_kb_contour_gf
+  !
+  !CONVOLUTION:
+  interface convolute_kb_contour_gf
+     module procedure convolute_kb_contour_gf_simple
+     module procedure convolute_kb_contour_gf_recursive
+     module procedure convolute_kb_contour_gf_delta
+  end interface convolute_kb_contour_gf
+  public :: convolute_kb_contour_gf
+  !
+  !
+  !OTHER ROUTINES && PLOT:
+  public :: extrapolate_kb_contour_gf
+  public :: save_kb_contour_gf
+  public :: inquire_kb_contour_gf
+  public :: read_kb_contour_gf
+  public :: plot_kb_contour_gf
+  !
+  !
+  !INTEGRATION ROUTINES:
+  interface kb_trapz
+     module procedure kb_trapz_d
+     module procedure kb_trapz_c
+  end interface kb_trapz
+  !
+  interface kb_half_trapz
+     module procedure kb_half_trapz_d
+     module procedure kb_half_trapz_c
+  end interface kb_half_trapz
+  !
+  public :: kb_trapz,kb_half_trapz
+  !
+  !
+  !VIE/VIDE SOLVER:
+  interface vie_kb_contour_gf
+     module procedure vie_kb_contour_gf_q
+     module procedure vie_kb_contour_gf_delta
+  end interface vie_kb_contour_gf
+  public :: vie_kb_contour_gf
+  public :: vide_kb_contour_gf
+  !
+  ! 
+  !SYMMETRIES & COMPONENTS:
+  public :: get_gtr
+  public :: get_adv
+  public :: get_rmix
+  public :: get_bar
+  !
+  !
+  !OVERLOAD OPERATORS
   interface operator(*)
      module procedure kb_contour_gf_scalarL_d
      module procedure kb_contour_gf_scalarL_c
@@ -46,101 +155,17 @@ MODULE NEQ_CONTOUR_GF
      module procedure kb_contour_dgf_scalarR_d
      module procedure kb_contour_dgf_scalarR_c
   end interface operator(*)
-
-
+  !
   interface assignment(=)
      module procedure kb_contour_gf_equality_
      module procedure kb_contour_dgf_equality_
      module procedure kb_contour_gf_equality__
      module procedure kb_contour_dgf_equality__
   end interface assignment(=)
-
-
-  interface check_dimension_kb_contour
-     module procedure check_dimension_kb_contour_gf
-     module procedure check_dimension_kb_contour_gf_
-     module procedure check_dimension_kb_contour_dgf
-     module procedure check_dimension_kb_contour_dgf_
-  end interface check_dimension_kb_contour
-
-  interface add_kb_contour_gf
-     module procedure add_kb_contour_gf_simple
-     module procedure add_kb_contour_gf_recursive
-     module procedure add_kb_contour_dgf
-     module procedure add_kb_contour_gf_d
-     module procedure add_kb_contour_gf_c
-  end interface add_kb_contour_gf
-
-  interface allocate_kb_contour_gf
-     module procedure allocate_kb_contour_gf_1
-     module procedure allocate_kb_contour_gf_2
-     module procedure allocate_kb_contour_gf_4
-  end interface allocate_kb_contour_gf
-
-  interface sum_kb_contour_gf
-     module procedure sum_kb_contour_gf_simple
-     module procedure sum_kb_contour_gf_recursive
-  end interface sum_kb_contour_gf
-
-  interface convolute_kb_contour_gf
-     module procedure convolute_kb_contour_gf_simple
-     module procedure convolute_kb_contour_gf_recursive
-     module procedure convolute_kb_contour_gf_delta
-  end interface convolute_kb_contour_gf
-
-  interface allocate_kb_contour_dgf
-     module procedure allocate_kb_contour_dgf_1
-     module procedure allocate_kb_contour_dgf_2
-  end interface allocate_kb_contour_dgf
-
-  interface kb_trapz
-     module procedure kb_trapz_d
-     module procedure kb_trapz_c
-  end interface kb_trapz
-
-  interface kb_half_trapz
-     module procedure kb_half_trapz_d
-     module procedure kb_half_trapz_c
-  end interface kb_half_trapz
-
-  interface vie_kb_contour_gf
-     module procedure vie_kb_contour_gf_q
-     module procedure vie_kb_contour_gf_delta
-  end interface vie_kb_contour_gf
-
-
-  public :: allocate_kb_contour_gf
-  public :: allocate_kb_contour_dgf
-  public :: deallocate_kb_contour_gf
-  public :: deallocate_kb_contour_dgf
-  public :: add_kb_contour_gf
-  public :: sum_kb_contour_gf
-  public :: del_kb_contour_gf
-  public :: extrapolate_kb_contour_gf
-  public :: save_kb_contour_gf
-  public :: inquire_kb_contour_gf
-  public :: read_kb_contour_gf
-  public :: plot_kb_contour_gf
-  public :: check_dimension_kb_contour
   !
-  !CONVOLUTION:
-  public :: convolute_kb_contour_gf
   !
-  !VIE/VIDE SOLVER:
-  public :: vie_kb_contour_gf
-  public :: vide_kb_contour_gf
-  !
-  !INTEGRATION ROUTINES:
-  public :: kb_trapz,kb_half_trapz
-  ! 
-  !OVERLOAD OPERATORS
   public :: operator(*)
   public :: assignment(=)
-
-  public :: get_gtr
-  public :: get_adv
-  public :: get_rmix
-  public :: get_bar
 
 
 
@@ -149,7 +174,7 @@ contains
 
 
   !======= ALLOCATE ======= 
-  subroutine allocate_kb_contour_gf_1(G,params)
+  subroutine allocate_kb_contour_gf_main(G,params)
     type(kb_contour_gf)     :: G
     type(kb_contour_params) :: params
     integer                 :: i,j,N,L,Lf
@@ -166,35 +191,37 @@ contains
     allocate(G%less(N,N))  ; G%less=zero
     allocate(G%ret(N,N))   ; G%ret=zero
     allocate(G%lmix(N,0:L)); G%lmix=zero
-    allocate(G%mats(0:L))  ; G%mats=0.d0
-    allocate(G%tau(0:Lf))  ; G%tau=0.d0
+    allocate(G%mats(0:L))  ; G%mats=0d0
     allocate(G%iw(Lf))     ; G%iw=zero
     G%status=.true.
-  end subroutine allocate_kb_contour_gf_1
+  end subroutine allocate_kb_contour_gf_main
   !
-  subroutine allocate_kb_contour_gf_2(G,params)
-    type(kb_contour_gf),dimension(2)     :: G
-    type(kb_contour_params) :: params
-    call allocate_kb_contour_gf_1(G(1),params)
-    call allocate_kb_contour_gf_1(G(2),params)
+  subroutine allocate_kb_contour_gf_nambu_redux(G,params)
+    type(kb_contour_gf),dimension(2) :: G
+    type(kb_contour_params)          :: params
+    call allocate_kb_contour_gf_main(G(1),params)
+    call allocate_kb_contour_gf_main(G(2),params)
     G(1)%anomalous=.false.
     G(2)%anomalous=.true.
-  end subroutine allocate_kb_contour_gf_2
+  end subroutine allocate_kb_contour_gf_nambu_redux
   !
-  subroutine allocate_kb_contour_gf_4(G,params)
-    type(kb_contour_gf),dimension(2,2)     :: G
-    type(kb_contour_params) :: params
-    call allocate_kb_contour_gf_1(G(1,1),params)
-    call allocate_kb_contour_gf_1(G(1,2),params)
-    call allocate_kb_contour_gf_1(G(2,1),params)
-    call allocate_kb_contour_gf_1(G(2,2),params)
+  subroutine allocate_kb_contour_gf_nambu(G,params)
+    type(kb_contour_gf),dimension(2,2) :: G
+    type(kb_contour_params)            :: params
+    integer                            :: i,j
+    do i=1,2
+       do j=1,2
+          call allocate_kb_contour_gf_main(G(i,j),params)
+       enddo
+    enddo
     G(1,1)%anomalous=.false.
     G(1,2)%anomalous=.true.
     G(2,1)%anomalous=.true.
     G(2,2)%anomalous=.false.
-  end subroutine allocate_kb_contour_gf_4
+  end subroutine allocate_kb_contour_gf_nambu
   !
-  subroutine allocate_kb_contour_dgf_1(dG,params,wgtr)
+  !
+  subroutine allocate_kb_contour_dgf_main(dG,params,wgtr)
     type(kb_contour_dgf)    :: dG
     type(kb_contour_params) :: params
     integer                 :: i,j,N,L
@@ -214,16 +241,16 @@ contains
        dG%gtr=zero
     endif
     dG%status=.true.
-  end subroutine allocate_kb_contour_dgf_1
+  end subroutine allocate_kb_contour_dgf_main
   !
-  subroutine allocate_kb_contour_dgf_2(dG,params)
+  subroutine allocate_kb_contour_dgf_nambu_redux(dG,params)
     type(kb_contour_dgf),dimension(2)     :: dG
     type(kb_contour_params) :: params
-    call allocate_kb_contour_dgf_1(dG(1),params)
-    call allocate_kb_contour_dgf_1(dG(2),params)
+    call allocate_kb_contour_dgf_main(dG(1),params)
+    call allocate_kb_contour_dgf_main(dG(2),params)
     dG(1)%anomalous=.false.
     dG(2)%anomalous=.true.
-  end subroutine allocate_kb_contour_dgf_2
+  end subroutine allocate_kb_contour_dgf_nambu_redux
 
 
 
@@ -237,7 +264,7 @@ contains
   subroutine deallocate_kb_contour_gf(G)
     type(kb_contour_gf) :: G
     if(.not.G%status)stop "contour_gf/deallocate_kb_contour_gf: G not allocated"
-    deallocate(G%less,G%ret,G%lmix,G%mats,G%tau,G%iw)
+    deallocate(G%less,G%ret,G%lmix,G%mats,G%iw)
     G%N=0
     G%L=0
     G%Lf=0
@@ -352,7 +379,6 @@ contains
     call store_data(reg(file)//"_ret.data.neqipt", G%ret(:,:))
     call store_data(reg(file)//"_lmix.data.neqipt",G%lmix(:,0:))
     call store_data(reg(file)//"_mats.data.neqipt",G%mats(0:))
-    call store_data(reg(file)//"_tau.data.neqipt",G%tau(0:))
     call store_data(reg(file)//"_iw.data.neqipt",G%iw(:))
   end subroutine save_kb_contour_gf
   !
@@ -390,7 +416,6 @@ contains
     call read_data(trim(file)//"_ret.data.neqipt",G%ret(:,:))
     call read_data(trim(file)//"_lmix.data.neqipt",G%lmix(:,0:))
     call read_data(trim(file)//"_mats.data.neqipt",G%mats(0:))
-    call read_data(trim(file)//"_tau.data.neqipt",G%tau(0:))
     call read_data(trim(file)//"_iw.data.neqipt",G%iw(:))
   end subroutine read_kb_contour_gf
   !
@@ -476,11 +501,6 @@ contains
   !======= ADD ======= 
   !C(t,t')=A(t,t') + B(t,t'), with t=t_max && t'=0,t_max
   !t_max_index==N
-  !IF YOU WANT THIS TO BE OVERLOADED IN + OPERATOR
-  !C SHOULD BE ALLOCATED INSIDE THE FUNCTION ADD_KB...
-  !BECAUSE POINTERS IS THE RESULT OF FUNCTION ITSELF (C).
-  !ANYWAY THIS REQUIRE ONE TO CHECK ALL THE SIZES AND ALLOCATION
-  !I RATHER PREFER TO USE THIS ROUTINE NOW...
   subroutine add_kb_contour_gf_simple(A,B,C,params)
     type(kb_contour_gf)     :: A,B,C
     type(kb_contour_params) :: params
@@ -489,7 +509,7 @@ contains
     if(  (.not.A%status).OR.&
          (.not.B%status).OR.&
          (.not.C%status))stop "contour_gf/add_kb_contour_gf: A,B,C not allocated"
-    N   = params%Ntime   !<== work with the ACTUAL size of the contour
+    N   = params%Ntime   !<== work with the TOTAL size of the contour
     L   = params%Ntau
     !
     checkA=check_dimension_kb_contour(A,N,L) 
@@ -500,8 +520,7 @@ contains
     C%ret(:,:)  = A%ret(:,:)  + B%ret(:,:)
     C%lmix(:,0:)= A%lmix(:,0:)+ B%lmix(:,0:)
     C%mats(0:)  = A%mats(0:)  + B%mats(0:)
-    C%tau(0:)   = A%tau(0:)   + B%tau(0:)
-    C%iw(0:)    = A%iw(0:)    + B%iw(0:)
+    C%iw(:)    = A%iw(:)    + B%iw(:)
   end subroutine  add_kb_contour_gf_simple
 
   subroutine add_kb_contour_gf_recursive(A,C,params)
@@ -516,7 +535,7 @@ contains
        if(  (.not.A(i)%status) )stop "contour_gf/add_kb_contour_gf: A(i) not allocated"
     enddo
     if(  (.not.C%status) )stop "contour_gf/add_kb_contour_gf: A,B,C not allocated"
-    N   = params%Ntime
+    N   = params%Ntime    !<== work with the TOTAL size of the contour
     L   = params%Ntau
     !
     do i=1,Na
@@ -530,8 +549,7 @@ contains
        C%ret(:,:)  = C%ret(:,:)  + A(i)%ret(:,:)
        C%lmix(:,0:)= C%lmix(:,0:)+ A(i)%lmix(:,0:)
        C%mats(0:)  = C%mats(0:)  + A(i)%mats(0:)
-       C%tau(0:)   = C%tau(0:)   + A(i)%tau(0:)
-       C%iw(0:)    = C%iw(0:)    + A(i)%iw(0:)
+       C%iw(:)     = C%iw(:)    + A(i)%iw(:)
     enddo
   end subroutine  add_kb_contour_gf_recursive
 
@@ -554,7 +572,7 @@ contains
     C%lmix(0:)= A%lmix(0:)+ B%lmix(0:)
   end subroutine add_kb_contour_dgf
 
-  subroutine add_kb_contour_gf_d(A,B,C,params)
+  subroutine add_kb_contour_gf_delta_d(A,B,C,params)
     type(kb_contour_gf)     :: A,C
     real(8),dimension(:)    :: B
     type(kb_contour_params) :: params
@@ -572,18 +590,15 @@ contains
     C%ret(:,:)  = A%ret(:,:)
     C%lmix(:,0:)= A%lmix(:,0:)
     C%mats(0:)  = A%mats(0:)
-    C%tau(0:)   = A%tau(0:)
-    C%iw(0:)    = A%iw(0:)
+    C%iw(:)     = A%iw(:) + B(1)
     !
     do i=1,N
        C%ret(i,i) = C%ret(i,i) + B(i)
     enddo
-    do i=0,L
-       C%mats(i) = C%mats(i) + B(1)
-    enddo
-  end subroutine  add_kb_contour_gf_d
+    C%mats(0) = C%mats(0) + B(1)
+  end subroutine  add_kb_contour_gf_delta_d
 
-  subroutine add_kb_contour_gf_c(A,B,C,params)
+  subroutine add_kb_contour_gf_delta_c(A,B,C,params)
     type(kb_contour_gf)     :: A,C
     complex(8),dimension(:) :: B
     type(kb_contour_params) :: params
@@ -601,16 +616,20 @@ contains
     C%ret(:,:)  = A%ret(:,:)
     C%lmix(:,0:)= A%lmix(:,0:)
     C%mats(0:)  = A%mats(0:)
-    C%tau(0:)   = A%tau(0:)
-    C%iw(0:)    = A%iw(0:)
+    C%iw(:)     = A%iw(:) + B(1)
     !
     do i=1,N
        C%ret(i,i) = C%ret(i,i) + B(i)
     enddo
-    do i=0,L
-       C%mats(i) = C%mats(i) + B(1)
-    enddo
-  end subroutine  add_kb_contour_gf_c
+    C%mats(0) = C%mats(0) + B(1)
+  end subroutine  add_kb_contour_gf_delta_c
+
+
+
+
+
+
+
 
 
 
@@ -631,6 +650,11 @@ contains
     N   = params%Nt   !<== work with the ACTUAL size of the contour
     L   = params%Ntau
     !
+    if(N==1)then
+       C%mats(0:) = ak*A%mats(0:) + bk*B%mats(0:)
+       C%iw(:)    = ak*A%iw(:)    + bk*B%iw(:)
+    endif
+    !
     C%ret(N,1:N)   = ak*A%ret(N,1:N)   + bk*B%ret(N,1:N)
     C%less(N,1:N)  = ak*A%less(N,1:N)  + bk*B%less(N,1:N)
     C%lmix(N,0:)   = ak*A%lmix(N,0:)   + bk*B%lmix(N,0:)
@@ -643,12 +667,87 @@ contains
     !
   end subroutine sum_kb_contour_gf_simple
 
-  subroutine sum_kb_contour_gf_recursive(A,ak,C,params)
+  subroutine sum_kb_contour_gf_delta_d(A,ak,B,bk,C,params)
+    type(kb_contour_gf)               :: A
+    real(8),dimension(:)              :: B
+    type(kb_contour_gf),intent(inout) :: C
+    real(8)                           :: ak,bk
+    type(kb_contour_params)           :: params
+    integer                           :: N,L
+    if(  (.not.A%status).OR.&
+         (.not.C%status))stop "contour_gf/addup_kb_contour_gf: G or Gk not allocated"
+    !
+    N   = params%Nt   !<== work with the ACTUAL size of the contour
+    L   = params%Ntau
+    !
+    call del_kb_contour_gf(C,params)
+    !
+    if(N==1)then 
+       C%mats(0)  = ak*A%mats(0)  + B(1)
+       C%mats(1:) = ak*A%mats(1:)
+       C%iw(:)    = ak*A%iw(:)    + B(1)
+    endif
+    !
+    C%ret(N,1:N)   = ak*A%ret(N,1:N)
+    C%less(N,1:N)  = ak*A%less(N,1:N)
+    C%lmix(N,0:)   = ak*A%lmix(N,0:)
+    !
+    if(.not.C%anomalous)then
+       C%less(1:N-1,N)= -conjg(C%less(N,1:N-1))
+    else
+       C%less(1:N-1,N)= C%less(N,1:N-1)+C%ret(N,1:N-1)
+    endif
+    !
+    C%ret(N,N) = C%ret(N,N) + B(N)
+    !
+  end subroutine sum_kb_contour_gf_delta_d
+
+  subroutine sum_kb_contour_gf_delta_c(A,ak,B,bk,C,params)
+    type(kb_contour_gf)               :: A
+    complex(8),dimension(:)           :: B
+    type(kb_contour_gf),intent(inout) :: C
+    real(8)                           :: ak,bk
+    type(kb_contour_params)           :: params
+    integer                           :: N,L
+    if(  (.not.A%status).OR.&
+         (.not.C%status))stop "contour_gf/addup_kb_contour_gf: G or Gk not allocated"
+    !
+    N   = params%Nt   !<== work with the ACTUAL size of the contour
+    L   = params%Ntau
+    !
+    call del_kb_contour_gf(C,params)
+    !
+    if(N==1)then 
+       C%mats(0)  = ak*A%mats(0)  + B(1)
+       C%mats(1:) = ak*A%mats(1:)
+       C%iw(:)    = ak*A%iw(:)    + B(1)
+    endif
+    !
+    C%ret(N,1:N)   = ak*A%ret(N,1:N)
+    C%less(N,1:N)  = ak*A%less(N,1:N)
+    C%lmix(N,0:)   = ak*A%lmix(N,0:)
+    !
+    if(.not.C%anomalous)then
+       C%less(1:N-1,N)= -conjg(C%less(N,1:N-1))
+    else
+       C%less(1:N-1,N)= C%less(N,1:N-1)+C%ret(N,1:N-1)
+    endif
+    !
+    C%ret(N,N) = C%ret(N,N) + B(N)
+    C%mats(0) = C%mats(0) + B(1)
+    !
+  end subroutine sum_kb_contour_gf_delta_c
+
+  subroutine sum_kb_contour_gf_recursive(A,ak,C,params,iaddup)
     type(kb_contour_gf)               :: A(:)
     real(8)                           :: ak(size(A))
     type(kb_contour_gf),intent(inout) :: C
     type(kb_contour_params)           :: params
     integer                           :: N,L,Na,i
+    logical,optional                  :: iaddup
+    logical                           :: iaddup_
+    !
+    iaddup_=.false.;if(present(iaddup))iaddup_=iaddup
     !
     Na=size(A)
     !
@@ -659,6 +758,15 @@ contains
     !
     N   = params%Nt   !<== work with the ACTUAL size of the contour
     L   = params%Ntau
+    !
+    if(.not.iaddup_)call del_kb_contour_gf(C,params)
+    !
+    if(N==1)then
+       do i=1,Na
+          C%mats(0:) = C%mats(0:) + ak(i)*A(i)%mats(0:)
+          C%iw(:)    = C%iw(:)    + ak(i)*A(i)%iw(:)
+       enddo
+    endif
     !
     do i=1,Na
        C%ret(N,1:N)   = C%ret(N,1:N)  + ak(i)*A(i)%ret(N,1:N)
@@ -692,6 +800,11 @@ contains
     N   = params%Nt   !<== work with the ACTUAL size of the contour
     L   = params%Ntau
     !
+    if(N==1)then
+       G%iw = zero
+       G%mats = 0d0
+    endif
+    !
     G%ret(N,1:N)   = zero
     G%less(N,1:N)  = zero
     G%lmix(N,0:)   = zero
@@ -709,8 +822,25 @@ contains
     !
     dG%less(1:N) = zero
     dG%ret(1:N)  = zero
-    dG%lmix(0:)= zero
+    dG%lmix(0:)  = zero
   end subroutine del_kb_contour_dgf
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -768,6 +898,10 @@ contains
        g%ret(N,N-1)=0.5d0*(g%ret(N,N)+g%ret(N,N-2))
     end select
   end subroutine extrapolate_kb_contour_gf
+
+
+
+
 
 
 
@@ -887,6 +1021,7 @@ contains
        C%less(i,N)=zero
     enddo
     ! do i=1,N
+    !    C%less(i,N)=zero
     !    do k=0,L
     !       !         AxB(k)=A%lmix(i,k)*conjg(B%lmix(n,L-k))
     !       AxB(k)=A%lmix(i,k)*get_rmix(B,k,N,L)
@@ -1536,7 +1671,6 @@ contains
     G1%ret(:,:)   = C
     G1%lmix(:,0:) = C
     G1%mats(0:)   = C
-    G1%tau(0:)    = C
     G1%iw(:)      = C
   end subroutine kb_contour_gf_equality_
   !
@@ -1547,7 +1681,6 @@ contains
     G1%ret(:,:)   = G2%ret(:,:)
     G1%lmix(:,0:) = G2%lmix(:,0:)
     G1%mats(0:)   = G2%mats(0:)
-    G1%tau(0:)    = G2%tau(0:)
     G1%iw(:)      = G2%iw(:)
   end subroutine kb_contour_gf_equality__
   !
@@ -1577,7 +1710,6 @@ contains
     F%ret(:,:)  = C*G%ret(:,:)
     F%lmix(:,0:)= C*G%lmix(:,0:)
     F%mats(0:)  = C*G%mats(0:)
-    F%tau(0:)   = C*G%tau(0:)
     F%iw(:)     = C*G%iw(:)
   end function kb_contour_gf_scalarL_d
   !
@@ -1624,7 +1756,6 @@ contains
     F%ret(:,:)  = G%ret(:,:)*C
     F%lmix(:,0:)= G%lmix(:,0:)*C
     F%mats(0:)  = G%mats(0:)*C
-    F%tau(0:)   = G%tau(0:)*C
     F%iw(:)     = G%iw(:)*C
   end function kb_contour_gf_scalarR_d
   !
@@ -1648,7 +1779,6 @@ contains
     F%ret(:,:)  = G%ret(:,:)*C
     F%lmix(:,0:)= G%lmix(:,0:)*C
     F%mats(0:)  = G%mats(0:)*C
-    F%tau(0:)   = G%tau(0:)*C
     F%iw(:)     = G%iw(:)*C
   end function kb_contour_gf_scalarR_c
   !
@@ -1735,10 +1865,8 @@ contains
        ! Matsubara imaginary time component
        if (.not.B%anomalous) then
           A%mats(0:L) = B%mats(L:0:-1)
-          A%tau(0:Lf) = B%tau(Lf:0:-1)
        else
           A%mats(0:L) = B%mats(0:L)
-          A%tau(0:Lf) = B%tau(0:Lf)
        endif
        !
        ! Matsubara frequencies component

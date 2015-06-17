@@ -119,7 +119,7 @@ contains
     delta= measure_delta(g(1,2),params)
     epot = measure_epot(dens,docc,params)
     ekin = measure_ekin_hk(Gk(1,:),Hk,Wtk,params)
-    write(unit,"(6F20.12)")params%t(itime),dens,delta,docc,epot,ekin,ekin+epot
+    write(unit,"(7F20.12)")params%t(itime),dens,delta,docc,epot,ekin,ekin+epot
     close(unit)
   end subroutine measure_observables_superc
 
