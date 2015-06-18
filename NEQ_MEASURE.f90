@@ -164,6 +164,11 @@ contains
     integer                             :: N
     N = params%Nt
     delta = dimag(F%less(N,N))
+    if(N==1)then
+       delta=Ui*delta
+    else
+       delta=U*delta
+    end if
   end function measure_delta
 
 

@@ -82,14 +82,15 @@ MODULE NEQ_CONTOUR_GF
      module procedure add_kb_contour_gf_delta_c
   end interface add_kb_contour_gf
   public :: add_kb_contour_gf
+  public :: add_kb_contour_dgf
   !
   !
   !SUM (PERIMETER) ROUTINES:
   interface sum_kb_contour_gf
      module procedure sum_kb_contour_gf_simple
+     module procedure sum_kb_contour_gf_recursive
      module procedure sum_kb_contour_gf_delta_d
      module procedure sum_kb_contour_gf_delta_c
-     module procedure sum_kb_contour_gf_recursive
   end interface sum_kb_contour_gf
   public :: sum_kb_contour_gf
   !
@@ -101,7 +102,8 @@ MODULE NEQ_CONTOUR_GF
   interface convolute_kb_contour_gf
      module procedure convolute_kb_contour_gf_simple
      module procedure convolute_kb_contour_gf_recursive
-     module procedure convolute_kb_contour_gf_delta
+     module procedure convolute_kb_contour_gf_delta_left
+     module procedure convolute_kb_contour_gf_delta_right
   end interface convolute_kb_contour_gf
   public :: convolute_kb_contour_gf
   !
@@ -520,7 +522,7 @@ contains
     C%ret(:,:)  = A%ret(:,:)  + B%ret(:,:)
     C%lmix(:,0:)= A%lmix(:,0:)+ B%lmix(:,0:)
     C%mats(0:)  = A%mats(0:)  + B%mats(0:)
-    C%iw(:)    = A%iw(:)    + B%iw(:)
+    C%iw(:)     = A%iw(:)      + B%iw(:)
   end subroutine  add_kb_contour_gf_simple
 
   subroutine add_kb_contour_gf_recursive(A,C,params)
@@ -549,7 +551,7 @@ contains
        C%ret(:,:)  = C%ret(:,:)  + A(i)%ret(:,:)
        C%lmix(:,0:)= C%lmix(:,0:)+ A(i)%lmix(:,0:)
        C%mats(0:)  = C%mats(0:)  + A(i)%mats(0:)
-       C%iw(:)     = C%iw(:)    + A(i)%iw(:)
+       C%iw(:)     = C%iw(:)     + A(i)%iw(:)
     enddo
   end subroutine  add_kb_contour_gf_recursive
 
@@ -590,8 +592,7 @@ contains
     C%ret(:,:)  = A%ret(:,:)
     C%lmix(:,0:)= A%lmix(:,0:)
     C%mats(0:)  = A%mats(0:)
-    C%iw(:)     = A%iw(:) + B(1)
-    !
+    !C%iw(:)     = A%iw(:) + B(1)
     do i=1,N
        C%ret(i,i) = C%ret(i,i) + B(i)
     enddo
@@ -616,8 +617,7 @@ contains
     C%ret(:,:)  = A%ret(:,:)
     C%lmix(:,0:)= A%lmix(:,0:)
     C%mats(0:)  = A%mats(0:)
-    C%iw(:)     = A%iw(:) + B(1)
-    !
+    !C%iw(:)     = A%iw(:) + B(1)
     do i=1,N
        C%ret(i,i) = C%ret(i,i) + B(i)
     enddo
@@ -667,77 +667,6 @@ contains
     !
   end subroutine sum_kb_contour_gf_simple
 
-  subroutine sum_kb_contour_gf_delta_d(A,ak,B,bk,C,params)
-    type(kb_contour_gf)               :: A
-    real(8),dimension(:)              :: B
-    type(kb_contour_gf),intent(inout) :: C
-    real(8)                           :: ak,bk
-    type(kb_contour_params)           :: params
-    integer                           :: N,L
-    if(  (.not.A%status).OR.&
-         (.not.C%status))stop "contour_gf/addup_kb_contour_gf: G or Gk not allocated"
-    !
-    N   = params%Nt   !<== work with the ACTUAL size of the contour
-    L   = params%Ntau
-    !
-    call del_kb_contour_gf(C,params)
-    !
-    if(N==1)then 
-       C%mats(0)  = ak*A%mats(0)  + B(1)
-       C%mats(1:) = ak*A%mats(1:)
-       C%iw(:)    = ak*A%iw(:)    + B(1)
-    endif
-    !
-    C%ret(N,1:N)   = ak*A%ret(N,1:N)
-    C%less(N,1:N)  = ak*A%less(N,1:N)
-    C%lmix(N,0:)   = ak*A%lmix(N,0:)
-    !
-    if(.not.C%anomalous)then
-       C%less(1:N-1,N)= -conjg(C%less(N,1:N-1))
-    else
-       C%less(1:N-1,N)= C%less(N,1:N-1)+C%ret(N,1:N-1)
-    endif
-    !
-    C%ret(N,N) = C%ret(N,N) + B(N)
-    !
-  end subroutine sum_kb_contour_gf_delta_d
-
-  subroutine sum_kb_contour_gf_delta_c(A,ak,B,bk,C,params)
-    type(kb_contour_gf)               :: A
-    complex(8),dimension(:)           :: B
-    type(kb_contour_gf),intent(inout) :: C
-    real(8)                           :: ak,bk
-    type(kb_contour_params)           :: params
-    integer                           :: N,L
-    if(  (.not.A%status).OR.&
-         (.not.C%status))stop "contour_gf/addup_kb_contour_gf: G or Gk not allocated"
-    !
-    N   = params%Nt   !<== work with the ACTUAL size of the contour
-    L   = params%Ntau
-    !
-    call del_kb_contour_gf(C,params)
-    !
-    if(N==1)then 
-       C%mats(0)  = ak*A%mats(0)  + B(1)
-       C%mats(1:) = ak*A%mats(1:)
-       C%iw(:)    = ak*A%iw(:)    + B(1)
-    endif
-    !
-    C%ret(N,1:N)   = ak*A%ret(N,1:N)
-    C%less(N,1:N)  = ak*A%less(N,1:N)
-    C%lmix(N,0:)   = ak*A%lmix(N,0:)
-    !
-    if(.not.C%anomalous)then
-       C%less(1:N-1,N)= -conjg(C%less(N,1:N-1))
-    else
-       C%less(1:N-1,N)= C%less(N,1:N-1)+C%ret(N,1:N-1)
-    endif
-    !
-    C%ret(N,N) = C%ret(N,N) + B(N)
-    C%mats(0) = C%mats(0) + B(1)
-    !
-  end subroutine sum_kb_contour_gf_delta_c
-
   subroutine sum_kb_contour_gf_recursive(A,ak,C,params,iaddup)
     type(kb_contour_gf)               :: A(:)
     real(8)                           :: ak(size(A))
@@ -781,6 +710,76 @@ contains
     endif
     !
   end subroutine sum_kb_contour_gf_recursive
+
+  subroutine sum_kb_contour_gf_delta_d(A,ak,B,bk,C,params)
+    type(kb_contour_gf)               :: A
+    real(8),dimension(:)              :: B
+    type(kb_contour_gf),intent(inout) :: C
+    real(8)                           :: ak,bk
+    type(kb_contour_params)           :: params
+    integer                           :: N,L
+    if(  (.not.A%status).OR.&
+         (.not.C%status))stop "contour_gf/addup_kb_contour_gf: G or Gk not allocated"
+    !
+    N   = params%Nt   !<== work with the ACTUAL size of the contour
+    L   = params%Ntau
+    !
+    call del_kb_contour_gf(C,params)
+    !
+    if(N==1)then 
+       C%mats(0)  = ak*A%mats(0)  + B(1)
+       C%mats(1:) = ak*A%mats(1:)
+    endif
+    !
+    C%ret(N,1:N)   = ak*A%ret(N,1:N)
+    C%less(N,1:N)  = ak*A%less(N,1:N)
+    C%lmix(N,0:)   = ak*A%lmix(N,0:)
+    !
+    if(.not.C%anomalous)then
+       C%less(1:N-1,N)= -conjg(C%less(N,1:N-1))
+    else
+       C%less(1:N-1,N)= C%less(N,1:N-1)+C%ret(N,1:N-1)
+    endif
+    !
+    C%ret(N,N) = C%ret(N,N) + B(N)
+    !
+  end subroutine sum_kb_contour_gf_delta_d
+
+  subroutine sum_kb_contour_gf_delta_c(A,ak,B,bk,C,params)
+    type(kb_contour_gf)               :: A
+    complex(8),dimension(:)           :: B
+    type(kb_contour_gf),intent(inout) :: C
+    real(8)                           :: ak,bk
+    type(kb_contour_params)           :: params
+    integer                           :: N,L
+
+    if(  (.not.A%status).OR.&
+         (.not.C%status))stop "contour_gf/addup_kb_contour_gf: G or Gk not allocated"
+    !
+    N   = params%Nt   !<== work with the ACTUAL size of the contour
+    L   = params%Ntau
+    !
+    call del_kb_contour_gf(C,params)
+    !
+    if(N==1)then 
+       C%mats(0)  = ak*A%mats(0)  + B(1)
+       C%mats(1:) = ak*A%mats(1:)
+    endif
+    !
+    C%ret(N,1:N)   = ak*A%ret(N,1:N) 
+    C%less(N,1:N)  = ak*A%less(N,1:N)
+    C%lmix(N,0:)   = ak*A%lmix(N,0:)
+    !
+    if(.not.C%anomalous)then
+       C%less(1:N-1,N)= -conjg(C%less(N,1:N-1))
+    else
+       C%less(1:N-1,N)= C%less(N,1:N-1)+C%ret(N,1:N-1)
+    endif
+    !
+    C%ret(N,N) = C%ret(N,N) + B(N)
+    ! C%mats(0) = C%mats(0) + B(1)
+    !
+  end subroutine sum_kb_contour_gf_delta_c
 
 
 
@@ -1113,31 +1112,63 @@ contains
   !======= CONVOLUTION WITH A FUNCTION MULTIPLIED BY THE DELTA FUNCTION======= 
   !C(t,t')=(A*B)(t,t'), with t=t_max && t'=0,t_max
   !t_max_index==N
-  ! In the case B(t,t')=B(t)delta(t,t')
-  subroutine convolute_kb_contour_gf_delta(A,B,C,params)
-    type(kb_contour_gf)                 :: A,C
-    complex(8),dimension(0:)            :: B
+  ! The case A(t,t')=A(t)delta(t,t')
+  subroutine convolute_kb_contour_gf_delta_left(A,B,C,params)
+    type(kb_contour_gf)                 :: B,C
+    complex(8),dimension(:)             :: A
     type(kb_contour_params)             :: params
     integer                             :: N,L
-    real(8)                             :: dt,dtau
-    complex(8),dimension(:),allocatable :: AxB    
+    integer                             :: i,j,k,itau,jtau
+    logical                             :: checkB,checkC
+    if(  (.not.B%status).OR.&
+         (.not.C%status))stop "contour_gf/convolute_kb_contour_gf: A,B,C not allocated"
+    N   = params%Nt      !<== work with the ACTUAL size of the contour
+    L   = params%Ntau
+    !
+    checkB=check_dimension_kb_contour(B,params%Ntime,L) 
+    checkC=check_dimension_kb_contour(C,params%Ntime,L)
+    !
+    if (N.eq.1) then
+       ! Matsubara
+       C%mats = A(1)*B%mats
+    endif
+    !
+    do j=1,N
+       !Ret. component
+       C%ret(n,j) = A(n)*B%ret(n,j)
+       !Less. component
+       C%less(n,j) = A(n)*B%less(n,j)
+    enddo
+    ! do i=1,N-1
+    !    !Less. component
+    !    C%less(i,n)=A%less(i,N)*B(N)
+    ! enddo
+    !
+    !Lmix. component
+    do jtau=0,L
+       C%lmix(n,jtau) = A(n)*B%lmix(n,jtau)
+    enddo
+  end subroutine convolute_kb_contour_gf_delta_left
+  ! The case B(t,t')=B(t)delta(t,t')
+  subroutine convolute_kb_contour_gf_delta_right(A,B,C,params)
+    type(kb_contour_gf)                 :: A,C
+    complex(8),dimension(:)             :: B
+    type(kb_contour_params)             :: params
+    integer                             :: N,L
     integer                             :: i,j,k,itau,jtau
     logical                             :: checkA,checkC
+    !
     if(  (.not.A%status).OR.&
          (.not.C%status))stop "contour_gf/convolute_kb_contour_gf: A,B,C not allocated"
     N   = params%Nt      !<== work with the ACTUAL size of the contour
     L   = params%Ntau
-    dt  = params%dt
-    dtau= params%dtau
     !
     checkA=check_dimension_kb_contour(A,params%Ntime,L) 
     checkC=check_dimension_kb_contour(C,params%Ntime,L)
     !
-    allocate(AxB(0:max(L,N)))
-    !
     if (N.eq.1) then
        ! Matsubara
-       C%mats = A%mats*B(0)
+       C%mats(0:) = A%mats(0:)*B(1)
     endif
     !
     do j=1,N
@@ -1153,9 +1184,9 @@ contains
     !
     !Lmix. component
     do jtau=0,L
-       C%lmix(N,jtau) = A%lmix(N,jtau)*B(0)
+       C%lmix(N,jtau) = A%lmix(N,jtau)*B(1)
     enddo
-  end subroutine convolute_kb_contour_gf_delta
+  end subroutine convolute_kb_contour_gf_delta_right
 
 
 
