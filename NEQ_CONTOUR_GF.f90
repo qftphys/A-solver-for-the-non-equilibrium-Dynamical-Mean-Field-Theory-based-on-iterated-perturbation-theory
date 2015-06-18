@@ -88,6 +88,8 @@ MODULE NEQ_CONTOUR_GF
   !SUM (PERIMETER) ROUTINES:
   interface sum_kb_contour_gf
      module procedure sum_kb_contour_gf_simple
+     module procedure sum_kb_contour_gf_delta_d
+     module procedure sum_kb_contour_gf_delta_c
      module procedure sum_kb_contour_gf_recursive
      module procedure sum_kb_contour_gf_delta_d
      module procedure sum_kb_contour_gf_delta_c
@@ -666,6 +668,7 @@ contains
     endif
     !
   end subroutine sum_kb_contour_gf_simple
+
 
   subroutine sum_kb_contour_gf_recursive(A,ak,C,params,iaddup)
     type(kb_contour_gf)               :: A(:)

@@ -196,6 +196,16 @@ program neqDMFT
            !
            call convolute_kb_contour_gf( gk_aux(2,ik), SigmaHFB(2,1,:), Kerk, cc_params)
            call convolute_kb_contour_gf( Kerk, Gk(1,ik), Gk(2,ik), cc_params)
+! ! =======
+!            call vide_kb_contour_gf( Ham(:,ik)+SigmaHFB(1,1,:),SigmaReg(1,1),Gk_aux(1,ik),dGk_aux_old(1,ik),dGk_aux(1,ik),cc_params)
+!            call vide_kb_contour_gf(-Ham(:,ik)+SigmaHFB(2,2,:),SigmaReg(2,2),Gk_aux(2,ik),dGk_aux_old(2,ik),dGk_aux(2,ik),cc_params)
+!            ! solve a VIE for G(1,1;k) and a convolution to get G(2,1;k)
+!            ! Ker      = gk * Sigma(1,2) * fbark * Sigma(2,1)
+!            ! G(1,1;k) = gk + Ker*G(1,1;k) 
+!            ! G(2,1;k) = fbark * Sigma(2,1) * G(1,1;k)
+!            call convolute_kb_contour_gf( [Gk_aux(1,ik),Sigma(1,2),Gk_aux(2,ik),Sigma(2,1)],Kerk,cc_params)
+!            call vie_kb_contour_gf(gk_aux(1,ik),Kerk,Gk(1,ik),cc_params)
+! !>>>>>>> 26b07b8ce5eeefcd0156df029133e494dfd6d2e1
            call convolute_kb_contour_gf( [Gk_aux(2,ik),Sigma(2,1),Gk(1,ik)] ,Gk(2,ik),cc_params)
         enddo
         call sum_kb_contour_gf(Gk(1,:),wt(:),Gloc(1,1),cc_params)

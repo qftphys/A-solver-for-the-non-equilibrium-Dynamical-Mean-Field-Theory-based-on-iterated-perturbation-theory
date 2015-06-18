@@ -247,6 +247,28 @@ contains
     enddo
     deallocate(GxG0)
     !
+    !INITIALIZE THE WEISS FIELD G0^{x=M,<,R,\lmix}
+    allocate(det(Lf))
+    det = abs(g(1,1)%iw)**2 + g(1,2)%iw**2 !== g(1,1)*g(2,2) + g(1,2)*g(2,1)
+    g0(1,1)%iw = conjg(g(1,1)%iw)/det + selfReg(1,1)%iw
+    g0(1,2)%iw =-g(1,2)%iw/det        + selfReg(1,2)%iw
+    allocate(Rtau(0:Lf))
+    call fft_gf_iw2tau(g0(1,1)%iw,Rtau(0:),params%beta)
+    call fft_extract_gtau(Rtau,g0(1,1)%mats)
+    call fft_gf_iw2tau(g0(1,2)%iw,Rtau(0:),params%beta,[0d0,0d0,0d0,0d0])
+    call fft_extract_gtau(Rtau,g0(1,2)%mats)
+    deallocate(Rtau)
+    g0(1,1)%less(1,1) = -xi*g0(1,1)%mats(L)
+    g0(1,1)%ret(1,1)  = -xi
+    forall(i=0:L)g0(1,1)%lmix(1,i)=-xi*g0(1,1)%mats(L-i)
+    !
+    g0(1,2)%less(1,1) = -xi*g0(1,2)%mats(L)
+    g0(1,2)%ret(1,1)  = zero
+    forall(i=0:L)g0(1,2)%lmix(1,i)=-xi*g0(1,2)%mats(L-i)
+    !
+    call get_bar(g0(2,2),g0(1,1),params)
+    call get_bar(g0(2,1),g0(1,2),params)
+    !
     return
   end subroutine neq_continue_equilibirum_normal_bethe
   !<TODO
@@ -308,11 +330,11 @@ contains
     dGk%lmix(0:)= -xi*(Hk-SelfHF)*Gk%lmix(1,0:)
     do j=0,L
        do k=0,j
-          SxG(k)=self%lmix(1,k)*Gk%mats(k+L-j)
+          SxG(k)=SelfReg%lmix(1,k)*Gk%mats(k+L-j)
        end do
        dGk%lmix(j)=dGk%lmix(j)+xi*params%dtau*kb_trapz(SxG(0:),0,j)
        do k=j,L
-          SxG(k)=self%lmix(1,k)*Gk%mats(k-j)
+          SxG(k)=SelfReg%lmix(1,k)*Gk%mats(k-j)
        end do
        dGk%lmix(j)=dGk%lmix(j)-xi*params%dtau*kb_trapz(SxG(0:),j,L) 
     enddo
@@ -329,6 +351,7 @@ contains
     complex(8)                          :: SelfHFB(2,2)
     type(kb_contour_gf)                 :: Self(2,2)
     real(8)                             :: Hk
+    complex(8)                          :: SelfHFB(2,2)
     type(kb_contour_params)             :: params
     integer                             :: i,j,k,L,Lf
     real(8)                             :: nk,det
@@ -524,7 +547,6 @@ contains
        !Scoeff  = tail_coeff_sigma(Ui,dens)
        call fft_sigma_tau2iw(Self(1,1)%iw,Rtau(0:),beta)!,Scoeff) !<=== Get Sigma(iw) = fft(tmp_self(tau_))
        deallocate(Rtau)
-
     else
        write(*,"(A)")"Start from Non-interacting/Hartree-Fock Sigma(iw)=Ui*(n-1/2)"
        dens=0.5d0
@@ -552,7 +574,8 @@ contains
        selfHFB(1,2,1) = -delta                              !<=== Get Sigma_HF_12  = -Delta = -U*Phi
        selfHFB(2,1,1) = -delta                              !<=== Get Sigma_HF_22  = -Delta = Sigma_HF_12
        call fft_sigma_tau2iw(Self(1,2)%iw,Rtau(0:),beta)   !<=== Get Sigma_12(iw) = fft(tmp_self(tau_))
-       deallocate(Rtau)
+
+      deallocate(Rtau)
     else
        write(*,"(A)")"Start from Non-interacting/Hartree-Fock Self(iw)=-Delta_SC"
        delta = deltasc
@@ -576,8 +599,6 @@ contains
     !
     return
   end subroutine read_equilibrium_sigma_superc
-
-
 
   subroutine fft_extract_gtau(g,gred)
     real(8),dimension(0:) :: g
