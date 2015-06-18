@@ -130,10 +130,13 @@ contains
     docc = nt**2
     if(N==1)then
        if(ui/=0.d0)then
-          do k=0,L
-             SxG(k)=Self%mats(L-k)*G%mats(k)
-          end do
-          docc=docc-1.d0/Ui*params%dtau*kb_trapz(SxG(0:),0,L)
+          ! do k=0,L
+          !    SxG(k)=Self%mats(L-k)*G%mats(k)
+          ! end do
+          ! docc=docc-1.d0/Ui*params%dtau*kb_trapz(SxG(0:),0,L)
+          docc = sum(dreal(Self%iw)*dreal(G%iw))-sum(dimag(Self%iw)*dimag(G%iw))
+          docc = docc/beta*2d0
+          docc = docc/Ui + nt - 0.25d0
        endif
     else
        if(u/=0.d0)then

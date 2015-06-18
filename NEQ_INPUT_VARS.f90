@@ -32,7 +32,7 @@ MODULE NEQ_INPUT_VARS
   real(8)                 :: dmft_error     !convergence error threshold
   character(len=16)       :: field_type    !choose the profile of the electric field
   integer                 :: Nsuccess      !number of convergence success
-  character(len=32)       :: g0file,sigfile
+  character(len=32)       :: sigma_file    !file containing the self-energy in imaginary time.
 
   !ELECTRIC FIELD VARIABLES:
   real(8)                 :: Efield        !Electric field strength
@@ -83,8 +83,7 @@ contains
     call parse_input_variable(ncycles    , "NCYCLES" , inputFILE , default    =1 , comment="number of cycles in pulsed light signal ")
     call parse_input_variable(omega0     , "OMEGA0" , inputFILE , default     =acos(-1d0) , comment="parameter for the Oscilatting field and Pulsed light")
     call parse_input_variable(E1         , "E1" , inputFILE , default         =0d0 , comment="Electric field strenght for the AC+DC case (tune to resonate)")
-    call parse_input_variable(g0file     , "G0FILE" , inputFILE , default     ="G0.restart" , comment="File with G0(iw) + header of the form: dens, <H>, <H**2>, <HDC>")
-    call parse_input_variable(sigfile    , "SIGFILE" , inputFILE , default    ="S.restart" , comment="File with Sigma(iw) + header")
+    call parse_input_variable(sigma_file    , "SIGMA_FILE" , inputFILE , default    ="Sigma.restart" , comment="File with Sigma(iw) + header")
     call save_input_file(inputFILE)
     call sf_version(revision)
   end subroutine read_input_init

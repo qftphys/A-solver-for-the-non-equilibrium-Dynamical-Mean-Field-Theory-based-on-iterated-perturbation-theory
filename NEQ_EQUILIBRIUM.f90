@@ -19,8 +19,9 @@ module NEQ_EQUILIBRIUM
   public  :: neq_setup_initial_conditions ! setup the initial conditions for the e/k dependent GF.
 
 
-  real(8)                          :: h1,h2,hDC,dens
-  real(8),allocatable,dimension(:) :: Rtau
+  real(8),allocatable,dimension(:)    :: Rtau
+  complex(8),allocatable,dimension(:) :: Riw
+
 
 contains
 
@@ -28,13 +29,12 @@ contains
   !+-------------------------------------------------------------------+
   !PURPOSE: obtain and continue the  equilibrium to Keldysh contour
   !+-------------------------------------------------------------------+
-  subroutine neq_continue_equilibirum_normal(g0,gk,dgk,g,selfHF,selfReg,self,Hk,Wtk,params)
+  subroutine neq_continue_equilibirum_normal(g0,gk,dgk,g,selfHF,self,Hk,Wtk,params)
     type(kb_contour_gf)                 :: g0
     type(kb_contour_gf)                 :: gk(:)
     type(kb_contour_dgf)                :: dgk(size(gk))
     type(kb_contour_gf)                 :: g
     type(kb_contour_gf)                 :: self
-    type(kb_contour_gf)                 :: selfReg
     complex(8)                          :: selfHF(:)
     type(kb_contour_params)             :: params
     real(8)                             :: Hk(size(gk)),Wtk(size(gk))
@@ -60,12 +60,12 @@ contains
     Lf= params%Niw
     !
     !INITIALIZE THE SELF-ENERGY SELF^{x=M,<,R,\lmix}
-    call read_equilibrium_sigma(selfHF,selfReg,self,params)            !<== get Sigma^{x=iw,tau,M,<,R,\lmix}
+    call read_equilibrium_sigma_normal(selfHF,self,params)            !<== get Sigma^{x=iw,tau,M,<,R,\lmix}
     !
     !INITIALIZE THE LOCAL GREEN'S FUNCTION Gloc^{x=M,<,R,\lmix}
     G=zero
     do ik=1,Lk
-       call neq_setup_initial_conditions(gk(ik),dgk(ik),self,hk(ik),params)
+       call neq_setup_initial_conditions(gk(ik),dgk(ik),selfHF(1),self,hk(ik),params)
     enddo
     call sum_kb_contour_gf(gk(:),wtk(:),g,params)
     !
@@ -82,12 +82,11 @@ contains
   end subroutine neq_continue_equilibirum_normal
 
 
-  subroutine neq_continue_equilibirum_bethe(g0,dg0,g,selfHF,selfReg,self,params,wband)
+  subroutine neq_continue_equilibirum_bethe(g0,dg0,g,selfHF,self,params,wband)
     type(kb_contour_gf)                 :: g0
     type(kb_contour_dgf)                :: dg0
     type(kb_contour_gf)                 :: g
     type(kb_contour_gf)                 :: self
-    type(kb_contour_gf)                 :: selfReg
     complex(8)                          :: selfHF(:)
     type(kb_contour_params)             :: params
     real(8),optional                    :: wband
@@ -112,7 +111,7 @@ contains
     Lf= params%Niw
     !
     !INITIALIZE THE SELF-ENERGY SELF^{x=M,<,R,\lmix}
-    call read_equilibrium_sigma(selfHF,selfReg,self,params)            !<== get Sigma^{x=iw,tau,M,<,R,\lmix}
+    call read_equilibrium_sigma_normal(selfHF,self,params)            !<== get Sigma^{x=iw,tau,M,<,R,\lmix}
     !
     !INITIALIZE THE GREEN'S FUNCTION G^{x=M,<,R,\lmix}
     do i=1,Lf
@@ -178,40 +177,45 @@ contains
   !+-------------------------------------------------------------------+
   !PURPOSE: setup initial conditions for k-resolved GF
   !+-------------------------------------------------------------------+
-  subroutine neq_setup_initial_conditions(Gk,dGk,Self,Hk,params)
-    type(kb_contour_gf)                 :: Gk,Self
+  subroutine neq_setup_initial_conditions(Gk,dGk,SelfHF,Self,Hk,params)
+    type(kb_contour_gf)                 :: Gk
     type(kb_contour_dgf)                :: dGk
+    complex(8)                          :: SelfHF
+    type(kb_contour_gf)                 :: Self
     real(8)                             :: Hk
     type(kb_contour_params)             :: params
     integer                             :: i,j,k,L,Lf
-    real(8)                             :: nk
-    complex(8)                          :: epsk
     complex(8),allocatable,dimension(:) :: SxG
-    real(8),dimension(:),allocatable    :: ftau
+    !
     L = params%Ntau
     Lf= params%Niw
+    !
     do i=1,Lf
        Gk%iw(i) = one/(xi*params%wm(i) - Hk - Self%iw(i))
     enddo
+    !
     allocate(Rtau(0:Lf))
-    call fft_gf_iw2tau(Gk%iw,Rtau(0:),beta)     !get G_k(tau)
-    call fft_extract_gtau(Rtau,Gk%mats)            !
+    call fft_gf_iw2tau(Gk%iw,Rtau(0:),beta) !get G_k(tau)
+    call fft_extract_gtau(Rtau,Gk%mats)     !
     deallocate(Rtau)
-    Gk%less(1,1) = -xi*Gk%mats(L)                 !get G^<_k(0,0)= xi*G^M_k(0-)
-    Gk%ret(1,1)  = -xi                            !get G^R_k(0,0)=-xi
-    forall(i=0:L)Gk%lmix(1,i)=-xi*Gk%mats(L-i)    !get G^\lmix_k(0,tau)=xi*G_k(tau<0)=-xi*G_k(beta-tau>0)
+    Gk%less(1,1)  = -xi*Gk%mats(L)          !get G^<_k(0,0)= xi*G^M_k(0-)
+    Gk%ret(1,1)   = -xi                     !get G^R_k(0,0)=-xi
+    Gk%lmix(1,0:L)= -xi*Gk%mats(L:0:-1)     !get G^\lmix_k(0,tau)=xi*G_k(tau<0)=-xi*G_k(beta-tau>0)
     !
     !Derivatives
     allocate(SxG(0:L))
+    !
     !get d/dt G_k^R = -i e(k,0)G_k^R
-    dGk%ret(1)  = -xi*Hk*Gk%ret(1,1)
+    dGk%ret(1)  = -xi*(Hk-SelfHF)*Gk%ret(1,1)
+    !
     !get d/dt G_k^< = -i e(k,0)G_k^< -xi(-xi)int_0^beta S^\lmix*G_k^\rmix
     do k=0,L
        SxG(k)=self%lmix(1,k)*conjg(Gk%lmix(1,L-k))
     end do
-    dGk%less(1) = -xi*Hk*Gk%less(1,1)-xi*(-xi)*params%dtau*kb_trapz(SxG(0:),0,L) 
+    dGk%less(1) = -xi*(Hk-SelfHF)*Gk%less(1,1)-xi*(-xi)*params%dtau*kb_trapz(SxG(0:),0,L) 
+    !
     !get d/dt G_k^\lmix = -xi*e(k,0)*G_k^\lmix - xi*int_0^beta G_k^\lmix*G_k^M
-    dGk%lmix(0:)= -xi*Hk*Gk%lmix(1,0:)
+    dGk%lmix(0:)= -xi*(Hk-SelfHF)*Gk%lmix(1,0:)
     do j=0,L
        do k=0,j
           SxG(k)=self%lmix(1,k)*Gk%mats(k+L-j)
@@ -231,21 +235,42 @@ contains
   !+-------------------------------------------------------------------+
   !PURPOSE: Read equilibrium solution and initialize the corresponding
   ! function.
-  ! We assume that the read self-energy function INCLUDES the Hartree-Fock
-  ! term, so we are able to extract it and separate regular from local part.
-  ! - read_equilibrium_sigma: read and init Self-energy function Self
-  ! - read_equilibrium_weiss: read and init Weiss FIeld G0
+  ! The code expects to read Sigma_reg(tau), that is the regular part 
+  ! of the self-energy in imaginary time. Regular here means deprived 
+  ! of the Hartree-Fock or Hartree-Fock-Bogoliubov term (1st order).
+  ! The latter term is reconstructed analytically from the knowledge 
+  ! of the static observables in the header of the self-energy files:
+  ! NORMAL SIGMA:
+  ! # U_i n [with U_i = interactino strenght at equilibrium, n=density
+  ! ....
+  ! ANOMALOUS SELF:
+  ! # U_i Delta [with U_i as before, Delta = U*phi, phi=<cc> order parameter.
+  ! ....
   !+-------------------------------------------------------------------+
-  subroutine read_equilibrium_sigma(selfHF,selfReg,self,params)
+  function read_header(file)  result(obs)
+    character(len=*) :: file
+    integer          :: unit
+    real(8)          :: u_,obs
+    unit = free_unit()
+    open(unit,file=file,status='old')
+    read(unit,*)u_,obs
+    close(unit)
+    if(u_/=Ui)then
+       print*,"read_header error: U_eq in "//file//" different from the input:",Ui
+       stop
+    endif
+    write(*,"(4A)")"Header of the file:",reg(txtfy(u_))," ",reg(txtfy(obs))
+  end function read_header
+
+  subroutine read_equilibrium_sigma_normal(selfHF,self,params)
     complex(8)              :: selfHF(:)
-    type(kb_contour_gf)     :: selfReg
     type(kb_contour_gf)     :: self
     type(kb_contour_params) :: params
-    real(8)                 :: wm,res,ims
+    real(8)                 :: tau,stau
     logical                 :: bool
     complex(8)              :: zeta
-    integer                 :: i,j,k,ik,unit,len,N,L,Lf
-    real(8)                 :: u_
+    integer                 :: i,j,k,ik,unit,Len,N,L,Lf,Ltau
+    real(8)                 :: u_,dens
     real(8),dimension(0:1)  :: Scoeff
     !
     if(.not.self%status)  stop "read_equilibrium_sigma: sigma is not allocated"
@@ -258,63 +283,44 @@ contains
     !
     selfHF=zero
     !
-    inquire(file=trim(sigfile),exist=bool)
+    inquire(file=reg(sigma_file),exist=bool)
     if(bool)then
-       !
-       write(*,"(A)")"Reading initial Sigma(iw) from file "//reg(sigfile)
+       write(*,"(A)")"read_equilibrium_sigma_normal: reading Sigma(tau) from file "//reg(sigma_file)
+       dens = read_header(reg(sigma_file))
+       Len  = file_length(reg(sigma_file))
+       Ltau = Len-1-1           !-1 for the header, -1 for the 0
        unit = free_unit()
-       i = file_length(trim(sigfile)) - 1
-       open(unit,file=trim(sigfile),status='old')
-       if(i/=Lf)then
-          print*,"read_equilibrium_sigma: Liw in "//reg(sigfile)//" different from the input:",Lf
-          print*,"read_equilibrium_sigma: check the header of the file u_i, <n>"
-          stop
-       endif
-       read(unit,*)u_,dens
-       if(u_/=Ui)then
-          print*,"read_equilibrium_sigma: U_eq in "//reg(sigfile)//" different from the input:",Ui
-          stop
-       endif
-       write(*,"(3A)")"Header of the file:",reg(txtfy(u_))," ",reg(txtfy(dens))
-       do i=1,Lf
-          read(unit,*)wm,ims,res
-          self%iw(i) = dcmplx(res,ims)
+       open(unit,file=reg(sigma_file),status='old')
+       if(Ltau < L)stop "read_equilibrium_sigma_normal error: Ltau < params%Ntau"
+       allocate(Rtau(0:Ltau))
+       do i=0,Ltau
+          read(unit,*)tau,Rtau(i)
        enddo
        close(unit)
-       selfHF(1) = dreal(self%iw(Lf))
-       selfReg%iw = self%iw - selfHF(1)
+       call fft_extract_gtau(Rtau(0:),Self%mats(0:))       !<=== Get Sigma(tau)= xtract(tmp_selt(tau_))
+       selfHF(1) = Ui*(dens-0.5d0)                          !<=== Get Sigma_HF  = Re[Sigma(iw-->infty)]
+       !get the matsubara freq. component to build Gloc and G0: 
        Scoeff  = tail_coeff_sigma(Ui,dens)
-       allocate(Rtau(0:Lf))
-       call fft_sigma_iw2tau(selfReg%iw,Rtau(0:),beta)!,Scoeff)
-       call fft_extract_gtau(Rtau(0:),selfReg%mats(0:))
+       call fft_sigma_tau2iw(Self%iw,Rtau(0:),beta,Scoeff) !<=== Get Sigma(iw) = fft(tmp_self(tau_))
+       self%iw = self%iw + selfHF(1)                       !<=== Sum back HF contribution: Sigma(iw)+Sigma_HF
        deallocate(Rtau)
        !
     else
        !
-       write(*,"(A)")"Start from Non-interacting/Hartree-Fock Sigma(iw)=Ui*(n-1/2)"
+       write(*,"(A)")"read_equilibrium_sigma_normal: start from Hartree-Fock Sigma(iw)=Ui*(n-1/2)"
        dens=0.5d0
        selfHF(1) = Ui*(dens-0.5d0)    !set self-energy to zero or whatever is the initial HF solution
-       selfReg   = zero
+       self      = zero
        !
     endif
     !
-    selfReg%less(1,1) = -xi*selfReg%mats(L)                     !OK
-    selfReg%ret(1,1) =   xi*(selfReg%mats(0)+selfReg%mats(L))   !OK
-    forall(i=0:L)selfReg%lmix(1,i)=-xi*selfReg%mats(L-i)        !small errors near 0,beta
+    self%less(1,1) = -xi*self%mats(L)                     !OK
+    self%ret(1,1) =   xi*(self%mats(0)+self%mats(L))      !OK
+    forall(i=0:L)self%lmix(1,i)=-xi*self%mats(L-i)        !small errors near 0,beta
     !
-    call add_kb_contour_gf(selfReg,selfHF,self,params)
-    !
-  end subroutine read_equilibrium_sigma
+  end subroutine read_equilibrium_sigma_normal
 
 
-
-
-  subroutine neq_fft_fg()
-  end subroutine neq_fft_fg
-
-
-  subroutine neq_fft_sigma()
-  end subroutine neq_fft_sigma
 
 
   subroutine fft_extract_gtau(g,gred)
