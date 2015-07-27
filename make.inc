@@ -1,11 +1,8 @@
 ##$ COMPILER: suppprted compilers are ifort, gnu >v4.7
-##$ use mpif90 for parallel compiler
-FC=ifort
+FC=gfortran
 
 ##$ PLATFORM: supported platform are intel, gnu
-##$ if using a parallel compiler (mpif90) check
-##$ platform first using the cmd: $mpif90 -show
-PLAT=intel
+PLAT=gnu
 
 
 ##$ LOCATION OF THE scifor and dmft_tools DIRECTORIES
@@ -16,10 +13,10 @@ LIBDIR=/opt
 
 ##$ CHOOSE THE MODEL BY SELECTING THE PROGRAM DRIVER
 #EXE=neqdmft_bethe_quench
-#EXE=neqdmft_bethe_dos_quench
+EXE=neqdmft_bethe_dos_quench
 #EXE=neqdmft_2dsquare_quench
 #EXE=neqdmft_2dsquare_field
-EXE=neqdmft_attractive_bethe_dos_quench
+#EXE=neqdmft_attractive_bethe_dos_quench
 
 ##$ SET THE LOCATION OF YOU PROGRAM DRIVER (default is ./drivers)
 DIR =drivers

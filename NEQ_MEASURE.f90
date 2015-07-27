@@ -49,53 +49,64 @@ contains
   !+-------------------------------------------------------------------+
   subroutine measure_observables_normal(g,self,Gk,Hk,Wtk,params)
     type(kb_contour_gf)       :: g
-    type(kb_contour_gf)       :: self
+    type(kb_contour_sigma)    :: self
     type(kb_contour_gf)       :: gk(:)
     complex(8),dimension(:,:) :: Hk
     real(8)                   :: wtk(size(gk))
     type(kb_contour_params)   :: params
     integer                   :: unit,itime,Lk
     real(8)                   :: dens,docc,ekin,epot,etot
+    !
     Lk=size(Hk,2)
     if(size(Hk,1)<params%Ntime)stop "measure_observables: size(Hk),1 is not Ntime"
     if(size(Gk)/=Lk)           stop "measure_observables: size(Gk) is not Lk"
+    !
     itime = params%Nt
+    !
     unit = free_unit()
     open(unit,file="observables.info")
     write(unit,"(8A20)")"time","N","Docc","Epot","Ekin","Etot"
     close(unit)
     open(unit,file="observables.neqipt",position="append")
+    !
     dens = measure_dens(g,params)
     docc = measure_docc_normal(g,self,params)
     epot = measure_epot(dens,docc,params)
     ekin = measure_ekin_hk(Gk,Hk,Wtk,params)
+    !
     write(unit,"(6F20.12)")params%t(itime),dens,docc,epot,ekin,ekin+epot
     close(unit)
+    !
   end subroutine measure_observables_normal
 
   subroutine measure_observables_normal_bethe(g,self,params)
     type(kb_contour_gf)                :: g
-    type(kb_contour_gf)                :: self
+    type(kb_contour_sigma)             :: self
     type(kb_contour_params)            :: params
     integer                            :: unit,itime,Lk
     real(8)                            :: dens,docc,ekin,epot,etot
+    !
     itime = params%Nt
+    !
     unit = free_unit()
     open(unit,file="observables.info")
     write(unit,"(8A20)")"time","N","Docc","Epot","Ekin","Etot"
     close(unit)
     open(unit,file="observables.neqipt",position="append")
+    !
     dens = measure_dens(g,params)
     docc = measure_docc_normal(g,self,params)
     epot = measure_epot(dens,docc,params)
     ekin = measure_ekin_bethe(G,params)
+    !
     write(unit,"(6F20.12)")params%t(itime),dens,docc,epot,ekin,ekin+epot
     close(unit)
+    !
   end subroutine measure_observables_normal_bethe
 
   subroutine measure_observables_superc(g,self,Gk,Hk,Wtk,params)
     type(kb_contour_gf)       :: g(2,2)
-    type(kb_contour_gf)       :: self(2,2)
+    type(kb_contour_sigma)    :: self(2,2)
     type(kb_contour_gf)       :: gk(:,:)             ![2][Lk]
     complex(8),dimension(:,:) :: Hk                  ![Ntime][Lk]
     real(8)                   :: wtk(size(gk,2))     ![Lk]
@@ -109,18 +120,22 @@ contains
     if(size(Gk,2)/=Lk)         stop "measure_observables_superc: size(Gk,2) is not 2"
     !
     itime = params%Nt
+    !
     unit = free_unit()
     open(unit,file="observables.info")
     write(unit,"(8A20)")"time","N","Docc","Delta","Epot","Ekin","Etot"
     close(unit)
     open(unit,file="observables.neqipt",position="append")
+    !
     dens = measure_dens(g(1,1),params)
     docc = measure_docc_superc(g,self,params)
     delta= measure_delta(g(1,2),params)
     epot = measure_epot(dens,docc,params)
     ekin = measure_ekin_hk(Gk(1,:),Hk,Wtk,params)
+    !
     write(unit,"(7F20.12)")params%t(itime),dens,delta,docc,epot,ekin,ekin+epot
     close(unit)
+    !
   end subroutine measure_observables_superc
 
 
@@ -183,7 +198,7 @@ contains
   !+-------------------------------------------------------------------+
   function measure_docc_normal(g,self,params) result(docc)
     type(kb_contour_gf)                 :: g
-    type(kb_contour_gf)                 :: self
+    type(kb_contour_sigma)              :: self
     type(kb_contour_params)             :: params
     real(8)                             :: docc
     integer                             :: i,k,j,N,L
@@ -198,22 +213,22 @@ contains
     if(N==1)then
        if(ui/=0.d0)then
           do k=0,L
-             SxG(k)=Self%mats(L-k)*G%mats(k)
+             SxG(k)=Self%reg%mats(L-k)*G%mats(k)
           end do
           docc=docc-1.d0/Ui*params%dtau*kb_trapz(SxG(0:),0,L)
        endif
     else
        if(u/=0.d0)then
           do k=0,L
-             SxG(k)=Self%lmix(N,k)*conjg(G%lmix(N,L-k))
+             SxG(k)=Self%reg%lmix(N,k)*conjg(G%lmix(N,L-k))
           end do
           docc=docc + 1.d0/U*params%dtau*dimag( (-xi)*kb_trapz(SxG(0:),0,L) )
           do k=1,N
-             SxG(k)=Self%ret(N,k)*G%less(k,N)
+             SxG(k)=Self%reg%ret(N,k)*G%less(k,N)
           end do
           docc=docc + 1.d0/U*params%dt*dimag(kb_trapz(SxG(0:),1,N))
           do k=1,N
-             SxG(k)=Self%less(N,k)*conjg(G%ret(N,k))
+             SxG(k)=Self%reg%less(N,k)*conjg(G%ret(N,k))
           end do
           docc=docc + 1.d0/U*params%dt*dimag(kb_trapz(SxG(0:),1,N))
        endif
@@ -223,7 +238,7 @@ contains
 
   function measure_docc_superc(g,self,params) result(docc)
     type(kb_contour_gf)                 :: g(2,2)
-    type(kb_contour_gf)                 :: self(2,2)
+    type(kb_contour_sigma)              :: self(2,2)
     type(kb_contour_params)             :: params
     real(8)                             :: docc
     integer                             :: i,k,j,N,L
@@ -240,22 +255,22 @@ contains
     if(N==1)then
        if(ui/=0.d0)then
           do k=0,L
-             SxG(k)=Self(1,1)%mats(L-k)*G(1,1)%mats(k) + Self(1,2)%mats(L-k)*G(2,1)%mats(k)
+             SxG(k)=Self(1,1)%reg%mats(L-k)*G(1,1)%mats(k) + Self(1,2)%reg%mats(L-k)*G(2,1)%mats(k)
           end do
           docc=docc-1.d0/Ui*params%dtau*kb_trapz(SxG(0:),0,L)
        endif
     else
        if(u/=0.d0)then
           do k=0,L
-             SxG(k)=Self(1,1)%lmix(N,k)*get_rmix(G(1,1),k,N,L) + Self(1,2)%lmix(N,k)*get_rmix(G(2,1),k,N,L)
+             SxG(k)=Self(1,1)%reg%lmix(N,k)*get_rmix(G(1,1),k,N,L) + Self(1,2)%reg%lmix(N,k)*get_rmix(G(2,1),k,N,L)
           end do
           docc=docc + 1.d0/U*params%dtau*dimag( (-xi)*kb_trapz(SxG(0:),0,L) )
           do k=1,N
-             SxG(k)=Self(1,1)%ret(N,k)*G(1,1)%less(k,N) + Self(1,2)%ret(N,k)*G(2,1)%less(k,N)
+             SxG(k)=Self(1,1)%reg%ret(N,k)*G(1,1)%less(k,N) + Self(1,2)%reg%ret(N,k)*G(2,1)%less(k,N)
           end do
           docc=docc + 1.d0/U*params%dt*dimag(kb_trapz(SxG(0:),1,N))
           do k=1,N
-             SxG(k)=Self(1,1)%less(N,k)*get_adv(G(1,1),k,N) + Self(1,2)%less(N,k)*get_adv(G(2,1),k,N)
+             SxG(k)=Self(1,1)%reg%less(N,k)*get_adv(G(1,1),k,N) + Self(1,2)%reg%less(N,k)*get_adv(G(2,1),k,N)
           end do
           docc=docc + 1.d0/U*params%dt*dimag(kb_trapz(SxG(0:),1,N))
        endif
@@ -372,11 +387,11 @@ contains
   ! U(t)= U*docc(t) - n(t) + 1/4
   !+-------------------------------------------------------------------+
   function measure_epot_normal(g,self,params) result(epot)
-    type(kb_contour_gf)                 :: g
-    type(kb_contour_gf)                 :: self
-    type(kb_contour_params)             :: params
-    real(8)                             :: epot,docc,nt
-    integer                             :: i,k,j,N,L
+    type(kb_contour_gf)     :: g
+    type(kb_contour_sigma)  :: self
+    type(kb_contour_params) :: params
+    real(8)                 :: epot,docc,nt
+    integer                 :: i,k,j,N,L
     N = params%Nt
     L = params%Ntau
     !
@@ -392,11 +407,11 @@ contains
   end function measure_epot_normal
 
   function measure_epot_superc(g,self,params) result(epot)
-    type(kb_contour_gf)                 :: g(2,2)
-    type(kb_contour_gf)                 :: self(2,2)
-    type(kb_contour_params)             :: params
-    real(8)                             :: epot,docc,nt
-    integer                             :: i,k,j,N,L
+    type(kb_contour_gf)     :: g(2,2)
+    type(kb_contour_sigma)  :: self(2,2)
+    type(kb_contour_params) :: params
+    real(8)                 :: epot,docc,nt
+    integer                 :: i,k,j,N,L
     !
     N = params%Nt
     L = params%Ntau
@@ -413,10 +428,10 @@ contains
   end function measure_epot_superc
 
   function measure_epot_ntdocc(nt,docc,params) result(epot)
-    real(8)                             :: nt,docc
-    type(kb_contour_params)             :: params
-    real(8)                             :: epot
-    integer                             :: i,k,j,N,L
+    real(8)                 :: nt,docc
+    type(kb_contour_params) :: params
+    real(8)                 :: epot
+    integer                 :: i,k,j,N,L
     !
     N = params%Nt
     L = params%Ntau
