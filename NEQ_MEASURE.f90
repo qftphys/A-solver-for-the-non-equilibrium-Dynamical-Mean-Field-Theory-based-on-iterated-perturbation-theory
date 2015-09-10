@@ -10,21 +10,24 @@ MODULE NEQ_MEASURE
 
   private
 
-  interface measure_observables
-     module procedure measure_observables_normal_lattice
-     module procedure measure_observables_normal_bethe
-  end interface measure_observables
-
-
   interface measure_ekin
-     module procedure measure_ekin_normal_lattice
-     module procedure measure_ekin_normal_bethe
+     module procedure measure_ekin_hk
+     module procedure measure_ekin_bethe
   end interface measure_ekin
 
   interface measure_epot
      module procedure measure_epot_normal
      module procedure measure_epot_ntdocc
   end interface measure_epot
+
+  interface measure_docc
+     module procedure measure_docc_normal
+  end interface measure_docc
+
+  interface measure_observables
+     module procedure measure_observables_normal
+     module procedure measure_observables_normal_bethe
+  end interface measure_observables
 
   public :: measure_observables
   public :: measure_dens
@@ -40,52 +43,61 @@ contains
   !+-------------------------------------------------------------------+
   !PURPOSE: measure some observables and print them
   !+-------------------------------------------------------------------+
-  subroutine measure_observables_normal_lattice(g,self,Gk,Hk,Wtk,params)
-    type(kb_contour_gf)         :: g
-    type(kb_contour_gf)         :: self
-    type(kb_contour_gf)         :: gk(:)
-    complex(8),dimension(:,:)   :: Hk
-    real(8),dimension(size(gk)) :: wtk
-    type(kb_contour_params)     :: params
-    integer                     :: unit,itime,Lk
-    real(8)                     :: dens,docc,ekin,epot,etot
+  subroutine measure_observables_normal(g,self,Gk,Hk,Wtk,params)
+    type(kb_contour_gf)       :: g
+    type(kb_contour_sigma)    :: self
+    type(kb_contour_gf)       :: gk(:)
+    complex(8),dimension(:,:) :: Hk
+    real(8)                   :: wtk(size(gk))
+    type(kb_contour_params)   :: params
+    integer                   :: unit,itime,Lk
+    real(8)                   :: dens,docc,ekin,epot,etot
     !
-    Lk = size(Gk)
-    if(size(Hk,1)<params%Ntime)stop "measure_observables: size(Hk,1) is not Ntime"
-    if(size(Hk,2)/=Lk)         stop "measure_observables: size(Hk,2) is not Lk"
+    Lk=size(Hk,2)
+    if(size(Hk,1)<params%Ntime)stop "measure_observables: size(Hk),1 is not Ntime"
+    if(size(Gk)/=Lk)           stop "measure_observables: size(Gk) is not Lk"
     !
     itime = params%Nt
+    !
     unit = free_unit()
     open(unit,file="observables.info")
     write(unit,"(8A20)")"time","N","Docc","Epot","Ekin","Etot"
     close(unit)
     open(unit,file="observables.neqipt",position="append")
+    !
     dens = measure_dens(g,params)
-    docc = measure_docc(g,self,params)
+    docc = measure_docc_normal(g,self,params)
     epot = measure_epot(dens,docc,params)
-    ekin = measure_ekin_normal_lattice(Gk,Hk,Wtk,params)
+    ekin = measure_ekin_hk(Gk,Hk,Wtk,params)
+    !
     write(unit,"(6F20.12)")params%t(itime),dens,docc,epot,ekin,ekin+epot
     close(unit)
-  end subroutine measure_observables_normal_lattice
+    !
+  end subroutine measure_observables_normal
 
   subroutine measure_observables_normal_bethe(g,self,params)
     type(kb_contour_gf)                :: g
-    type(kb_contour_gf)                :: self
+    type(kb_contour_sigma)             :: self
     type(kb_contour_params)            :: params
     integer                            :: unit,itime,Lk
     real(8)                            :: dens,docc,ekin,epot,etot
+    !
     itime = params%Nt
+    !
     unit = free_unit()
     open(unit,file="observables.info")
     write(unit,"(8A20)")"time","N","Docc","Epot","Ekin","Etot"
     close(unit)
     open(unit,file="observables.neqipt",position="append")
+    !
     dens = measure_dens(g,params)
-    docc = measure_docc(g,self,params)
+    docc = measure_docc_normal(g,self,params)
     epot = measure_epot(dens,docc,params)
-    ekin = measure_ekin_normal_bethe(G,params)
+    ekin = measure_ekin_bethe(G,params)
+    !
     write(unit,"(6F20.12)")params%t(itime),dens,docc,epot,ekin,ekin+epot
     close(unit)
+    !
   end subroutine measure_observables_normal_bethe
 
 
@@ -97,10 +109,10 @@ contains
   ! n(t)=-xi*G^<(t,t)
   !+-------------------------------------------------------------------+
   function measure_dens(g,params) result(dens)
-    type(kb_contour_gf)     :: g
-    type(kb_contour_params) :: params
-    real(8)                 :: dens
-    integer                 :: N
+    type(kb_contour_gf)                 :: g
+    type(kb_contour_params)             :: params
+    real(8)                             :: dens
+    integer                             :: N
     N = params%Nt
     dens = dimag(G%less(N,N))
   end function measure_dens
@@ -111,12 +123,13 @@ contains
 
   !+-------------------------------------------------------------------+
   !PURPOSE: return the value of the double occupancy at a given istant of time
-  ! d(t)=n_up(t)*n_do(t)-1/U0*[Self^M*G^M]
-  !      n_up(t)*n_do(t)-i/U*[Self^R*G^< + Self^<*G^A + Self^\lmix*G^\rmix](t,t)
+  ! d(t)=n_up(t)*n_do(t)-1/U0*[S^M*G^M]
+  !      n_up(t)*n_do(t)-i/U*[S^R*G^< + S^<*G^A + S^\lmix*G^\rmix](t,t)
+  !
   !+-------------------------------------------------------------------+
-  function measure_docc(g,self,params) result(docc)
+  function measure_docc_normal(g,self,params) result(docc)
     type(kb_contour_gf)                 :: g
-    type(kb_contour_gf)                 :: self
+    type(kb_contour_sigma)              :: self
     type(kb_contour_params)             :: params
     real(8)                             :: docc
     integer                             :: i,k,j,N,L
@@ -131,31 +144,31 @@ contains
     if(N==1)then
        if(ui/=0.d0)then
           ! do k=0,L
-          !    SxG(k)=Self%mats(L-k)*G%mats(k)
+          !    SxG(k)=Self%reg%mats(L-k)*G%mats(k)
           ! end do
           ! docc=docc-1.d0/Ui*params%dtau*kb_trapz(SxG(0:),0,L)
-          docc = sum(dreal(Self%iw)*dreal(G%iw))-sum(dimag(Self%iw)*dimag(G%iw))
+          docc = sum(dreal(Self%reg%iw)*dreal(G%iw))-sum(dimag(Self%reg%iw)*dimag(G%iw))
           docc = docc/beta*2d0
           docc = docc/Ui + nt - 0.25d0
        endif
     else
        if(u/=0.d0)then
           do k=0,L
-             SxG(k)=Self%lmix(N,k)*conjg(G%lmix(N,L-k))
+             SxG(k)=Self%reg%lmix(N,k)*conjg(G%lmix(N,L-k))
           end do
           docc=docc + 1.d0/U*params%dtau*dimag( (-xi)*kb_trapz(SxG(0:),0,L) )
           do k=1,N
-             SxG(k)=Self%ret(N,k)*G%less(k,N)
+             SxG(k)=Self%reg%ret(N,k)*G%less(k,N)
           end do
           docc=docc + 1.d0/U*params%dt*dimag(kb_trapz(SxG(0:),1,N))
           do k=1,N
-             SxG(k)=Self%less(N,k)*conjg(G%ret(N,k))
+             SxG(k)=Self%reg%less(N,k)*conjg(G%ret(N,k))
           end do
           docc=docc + 1.d0/U*params%dt*dimag(kb_trapz(SxG(0:),1,N))
        endif
     endif
     deallocate(SxG)
-  end function measure_docc
+  end function measure_docc_normal
 
 
 
@@ -200,7 +213,7 @@ contains
   !Lattice: -i\sum_ks epsik(k,t)G_k(t,t)= 2*\sum_k e(k,t)n(k,t)
   !Bethe: E_k(t)=2*Im[G^R*G^< + G^<*G^A + G^\lmix*G^\rmix](t,t)
   !+-------------------------------------------------------------------+
-  function measure_ekin_normal_lattice(Gk,Hk,Wtk,params) result(ekin)
+  function measure_ekin_hk(Gk,Hk,Wtk,params) result(ekin)
     type(kb_contour_gf),dimension(:)    :: gk
     complex(8),dimension(:,:)           :: Hk
     real(8),dimension(:)                :: Wtk
@@ -220,9 +233,9 @@ contains
        Nkt  = dimag(Gk(ik)%less(N,N))
        Ekin = Ekin + 2d0*Wtk(ik)*Nkt*Hk(N,ik)
     enddo
-  end function measure_ekin_normal_lattice
+  end function measure_ekin_hk
 
-  function measure_ekin_normal_bethe(g,params) result(ekin)
+  function measure_ekin_bethe(g,params) result(ekin)
     type(kb_contour_gf)                 :: g
     type(kb_contour_params)             :: params
     real(8)                             :: ekin
@@ -253,7 +266,7 @@ contains
        ekin=ekin + 2.d0*params%dt*dimag(kb_trapz(Ker(0:),1,N))
     endif
     deallocate(Ker)
-  end function measure_ekin_normal_bethe
+  end function measure_ekin_bethe
 
 
 
@@ -263,39 +276,43 @@ contains
   ! U(t)= U*docc(t) - n(t) + 1/4
   !+-------------------------------------------------------------------+
   function measure_epot_normal(g,self,params) result(epot)
-    type(kb_contour_gf)                 :: g
-    type(kb_contour_gf)                 :: self
-    type(kb_contour_params)             :: params
-    real(8)                             :: epot,docc,nt
-    integer                             :: i,k,j,N,L
+    type(kb_contour_gf)     :: g
+    type(kb_contour_sigma)  :: self
+    type(kb_contour_params) :: params
+    real(8)                 :: epot,docc,nt
+    integer                 :: i,k,j,N,L
     N = params%Nt
     L = params%Ntau
     !
     if(N==1)then
        nt   = measure_dens(g,params)
        docc = measure_docc(g,self,params)
-       epot = Ui*(docc - nt + 0.25d0)
+       epot = abs(Ui)*(docc - nt + 0.25d0)
     else
        nt   = measure_dens(g,params)
        docc = measure_docc(g,self,params)
-       epot = U*(docc - nt + 0.25d0)
+       epot = abs(U)*(docc - nt + 0.25d0)
     endif
   end function measure_epot_normal
 
   function measure_epot_ntdocc(nt,docc,params) result(epot)
-    type(kb_contour_params)             :: params
-    real(8)                             :: epot,docc,nt
-    integer                             :: i,k,j,N,L
+    real(8)                 :: nt,docc
+    type(kb_contour_params) :: params
+    real(8)                 :: epot
+    integer                 :: i,k,j,N,L
     !
     N = params%Nt
     L = params%Ntau
     !
     if(N==1)then
-       epot = Ui*(docc - nt + 0.25d0)
+       epot = abs(Ui)*(docc - nt + 0.25d0)
     else
-       epot = U*(docc - nt + 0.25d0)
+       epot = abs(U)*(docc - nt + 0.25d0)
     endif
   end function measure_epot_ntdocc
+
+
+
 
 
 

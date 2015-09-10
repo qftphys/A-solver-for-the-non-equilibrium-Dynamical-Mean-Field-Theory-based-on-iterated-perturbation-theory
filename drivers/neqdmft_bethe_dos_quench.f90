@@ -10,8 +10,7 @@ program neqDMFT
   type(kb_contour_gf)                   :: Sbath
   type(kb_contour_gf)                   :: Gloc
   type(kb_contour_gf)                   :: Gwf
-  type(kb_contour_gf)                   :: Sigma
-  complex(8),dimension(:),allocatable   :: SigmaHF
+  type(kb_contour_sigma)                :: Sigma
   !
   type(kb_contour_gf)                   :: Ker
   type(kb_contour_gf),allocatable       :: Gk(:)
@@ -32,7 +31,6 @@ program neqDMFT
 
 
   !BUILD TIME GRIDS AND NEQ-PARAMETERS:
-  !=====================================================================
   call allocate_kb_contour_params(cc_params,Ntime,Ntau,Niw)
   call setup_kb_contour_params(cc_params,dt,beta)
 
@@ -49,10 +47,9 @@ program neqDMFT
 
 
   !ALLOCATE ALL THE FUNCTIONS INVOLVED IN THE CALCULATION:
-  allocate(SigmaHF(cc_params%Ntime)) !Self-Energy function (Hartree-Fock term)
-  call allocate_kb_contour_gf(Sigma,cc_params) !Self-Energy function
-  call allocate_kb_contour_gf(Gloc,cc_params)  !Local Green's function
-  call allocate_kb_contour_gf(Gwf,cc_params)   !Local Weiss-Field function
+  call allocate_kb_contour_sigma(Sigma,cc_params) !Self-Energy function
+  call allocate_kb_contour_gf(Gloc,cc_params)     !Local Green's function
+  call allocate_kb_contour_gf(Gwf,cc_params)      !Local Weiss-Field function
   call allocate_kb_contour_gf(Ker,cc_params)
   allocate(Gk(Lk),dGk(Lk),dGk_old(Lk))
   do ik=1,Lk
@@ -68,8 +65,7 @@ program neqDMFT
   !READ OR GUESS THE INITIAL WEISS FIELD G0 (t=t'=0)
   cc_params%Nt=1
   Gloc = zero
-  call neq_continue_equilibirum(Gwf,Gk,dGk,Gloc,SigmaHF,Sigma,epsik,wt,cc_params)
-  call measure_observables(Gloc,Sigma,cc_params)
+  call neq_continue_equilibirum(Gwf,Gk,dGk,Gloc,Sigma,epsik,wt,cc_params)
   do ik=1,Lk
      nk(1,ik)=dimag(Gk(ik)%less(1,1))
   enddo
@@ -78,6 +74,7 @@ program neqDMFT
         ham(i,ik)=epsik(ik)
      enddo
   enddo
+  call measure_observables(Gloc,Sigma,cc_params)
 
   !START THE TIME_STEP LOOP  1<t<=Nt
   !AT EACH TIME_STEP PERFORM A FULL DMFT CALCULATION:
@@ -85,6 +82,7 @@ program neqDMFT
      print*,""
      print*,"time step=",itime
      cc_params%Nt=itime
+
      !prepare the weiss-field at this actual time_step for DMFT:
      call  extrapolate_kb_contour_gf(Gwf,cc_params)
      call  extrapolate_kb_contour_gf(Gloc,cc_params)
@@ -99,14 +97,11 @@ program neqDMFT
         write(*,"(A,I4,A1)",advance='no')"dmft loop=",iloop," "
 
         !IMPURITY SOLVER: IPT.
-        !call neq_solve_hf(Gloc,SigmaHF,cc_params)
-        sigmaHF(itime) = zero
-        call neq_solve_ipt(Gwf,Sigma,cc_params) !<== get Sigma (regular part, no HF contribution)
-        !call sum_kb_contour_gf(Sigma,1d0,SigmaHF,1d0,Sigma,cc_params)
+        call neq_solve_ipt(Gwf,Gloc,Sigma,cc_params)
 
         !PERFORM THE SELF_CONSISTENCY: get local GF + update Weiss-Field
         do ik=1,Lk
-           call vide_kb_contour_gf(Ham(:,ik)-SigmaHF(:),Sigma,Gk(ik),dGk_old(ik),dGk(ik),cc_params)
+           call vide_kb_contour_gf(Ham(:,ik),Sigma,Gk(ik),dGk_old(ik),dGk(ik),cc_params)
         enddo
         call sum_kb_contour_gf(Gk(:),wt(:),Gloc,cc_params)
 
@@ -127,7 +122,7 @@ program neqDMFT
 
   !EVALUATE AND PRINT OTHER RESULTS OF THE CALCULATION
   call splot3d("nkVSepsikVStime.neqipt",cc_params%t,epsik,nk)
-  call plot_kb_contour_gf("Sigma",Sigma,cc_params)
+  call plot_kb_contour_sigma("Sigma",Sigma,cc_params)
   call plot_kb_contour_gf("Gloc",Gloc,cc_params)
   call plot_kb_contour_gf("G0",Gwf,cc_params)
   print*,"BRAVO"

@@ -94,8 +94,8 @@ contains
     params%t       = linspace(0d0,tmax_,Ntime,mesh=dt_)
     params%tau(0:) = linspace(0d0,beta,Ntau+1,mesh=dtau_)
     params%wm      = pi/beta*(2*arange(1,Niw)-1)
-    !if(dt_/=params%dt)stop "neq_contour/set_kb_contour_params: dt != dt_ "
-    !if(dtau_/=params%dtau)stop "neq_contour/set_kb_contour_params: dtau != dtau_ "
+    if(dt_/=params%dt)stop "neq_contour/set_kb_contour_params: dt != dt_ "
+    if(dtau_/=params%dtau)stop "neq_contour/set_kb_contour_params: dtau != dtau_ "
     call print_kb_contour_params(params)
     call write_kb_contour_params(params,"contour_info.neqipt")
   end subroutine setup_kb_contour_params
