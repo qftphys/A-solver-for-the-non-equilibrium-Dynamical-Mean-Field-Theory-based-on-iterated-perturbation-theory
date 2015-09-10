@@ -10,10 +10,10 @@
 NotebookFileLineBreakTest
 NotebookFileLineBreakTest
 NotebookDataPosition[       145,          7]
-NotebookDataLength[    127381,       2464]
-NotebookOptionsPosition[    125407,       2402]
-NotebookOutlinePosition[    125745,       2417]
-CellTagsIndexPosition[    125702,       2414]
+NotebookDataLength[    127281,       2458]
+NotebookOptionsPosition[    125207,       2394]
+NotebookOutlinePosition[    125645,       2411]
+CellTagsIndexPosition[    125602,       2408]
 WindowFrame->Normal*)
 
 (* Beginning of Notebook Content *)
@@ -59,8 +59,7 @@ Cell[TextData[{
    3.531028665019326*^9, 3.531028680833535*^9}, {3.531028711015703*^9, 
    3.531028736920497*^9}, {3.531028774611764*^9, 3.5310287803604813`*^9}, {
    3.531030943490707*^9, 3.531030962651846*^9}, {3.531030993808024*^9, 
-   3.531031006955288*^9}, {3.531031078370572*^9, 3.5310310888826113`*^9}},
- FormatType->"TextForm"],
+   3.531031006955288*^9}, {3.531031078370572*^9, 3.5310310888826113`*^9}}],
 
 Cell[BoxData[{
  RowBox[{
@@ -157,8 +156,7 @@ Cell[BoxData[""], "Input",
 
 Cell[TextData[StyleBox["Get the corresponding vector potential by indefinite \
 integration :",
- FontColor->RGBColor[1, 0, 0]]], "Input",
- FormatType->"TextForm"],
+ FontColor->RGBColor[1, 0, 0]]], "Input"],
 
 Cell[CellGroupData[{
 
@@ -325,8 +323,7 @@ Cell[TextData[{
   FontColor->RGBColor[1, 0, 0]]
 }], "Input",
  CellChangeTimes->{{3.5310310970605507`*^9, 3.531031115802183*^9}, {
-  3.5559281947560377`*^9, 3.55592819691824*^9}},
- FormatType->"TextForm"],
+  3.5559281947560377`*^9, 3.55592819691824*^9}}],
 
 Cell[BoxData[{
  RowBox[{
@@ -463,8 +460,7 @@ Cell[TextData[StyleBox["\nPlot  of impulse - like profile :",
  FontColor->RGBColor[1, 0, 0]]], "Input",
  CellFrame->{{0, 0}, {0, 2}},
  CellChangeTimes->{{3.531031269205587*^9, 3.531031282435705*^9}, 
-   3.5310313210612593`*^9, 3.555928067585156*^9},
- FormatType->"TextForm"],
+   3.5310313210612593`*^9, 3.555928067585156*^9}],
 
 Cell[CellGroupData[{
 
@@ -1065,8 +1061,7 @@ Cell[BoxData[""], "Input",
 Cell[TextData[StyleBox["Plot of the constant profile :",
  FontColor->RGBColor[1, 0, 0]]], "Input",
  CellChangeTimes->{{3.531031285822752*^9, 3.531031313420888*^9}, {
-  3.555928219444025*^9, 3.5559282212902517`*^9}},
- FormatType->"TextForm"],
+  3.555928219444025*^9, 3.5559282212902517`*^9}}],
 
 Cell[CellGroupData[{
 
@@ -1164,8 +1159,7 @@ Cell[BoxData[""], "Input",
 
 Cell[TextData[StyleBox["Plot of the ramp profile :",
  FontColor->RGBColor[1, 0, 0]]], "Input",
- CellChangeTimes->{{3.531031302630369*^9, 3.531031307196035*^9}},
- FormatType->"TextForm"],
+ CellChangeTimes->{{3.531031302630369*^9, 3.531031307196035*^9}}],
 
 Cell[CellGroupData[{
 
@@ -1424,8 +1418,7 @@ Cell[TextData[StyleBox["Plot of the Cos profile :",
  FontColor->RGBColor[1, 0, 0]]], "Input",
  CellChangeTimes->{{3.531031302630369*^9, 3.531031307196035*^9}, {
   3.5556116170262403`*^9, 3.555611617920147*^9}, {3.555611987748187*^9, 
-  3.5556119885144167`*^9}},
- FormatType->"TextForm"],
+  3.5556119885144167`*^9}}],
 
 Cell[CellGroupData[{
 
@@ -1829,8 +1822,7 @@ Cell[BoxData[""], "Input",
 
 Cell[TextData[StyleBox["Plot of the Cos profile :",
  FontColor->RGBColor[1, 0, 0]]], "Input",
- CellChangeTimes->{{3.5559283798892193`*^9, 3.555928385089901*^9}},
- FormatType->"TextForm"],
+ CellChangeTimes->{{3.5559283798892193`*^9, 3.555928385089901*^9}}],
 
 Cell[CellGroupData[{
 
@@ -2402,7 +2394,9 @@ VHGI2g==
 },
 WindowSize->{1132, 1031},
 WindowMargins->{{Automatic, 47}, {0, Automatic}},
-FrontEndVersion->"7.0 for Linux x86 (64-bit) (November 11, 2008)",
+PrivateNotebookOptions->{"VersionedStylesheet"->{"Default.nb"[8.] -> False}},
+FrontEndVersion->"11.0 for Mac OS X x86 (32-bit, 64-bit Kernel) (September \
+21, 2016)",
 StyleDefinitions->"Default.nb"
 ]
 (* End of Notebook Content *)
@@ -2416,58 +2410,57 @@ CellTagsIndex->{}
 *)
 (*NotebookFileOutline
 Notebook[{
-Cell[545, 20, 295, 6, 41, "Input"],
-Cell[843, 28, 2295, 34, 50, "Input"],
-Cell[3141, 64, 3148, 87, 173, "Input"],
-Cell[6292, 153, 145, 2, 32, "Input"],
-Cell[6440, 157, 161, 3, 32, "Input"],
+Cell[545, 20, 295, 6, 49, "Input"],
+Cell[843, 28, 2270, 33, 50, "Input"],
+Cell[3116, 63, 3148, 87, 167, "Input"],
+Cell[6267, 152, 145, 2, 32, "Input"],
+Cell[6415, 156, 136, 2, 32, "Input"],
 Cell[CellGroupData[{
-Cell[6626, 164, 1382, 34, 121, "Input"],
-Cell[8011, 200, 843, 26, 49, "Output"],
-Cell[8857, 228, 585, 17, 31, "Output"],
-Cell[9445, 247, 1651, 49, 84, "Output"],
-Cell[11099, 298, 276, 8, 48, "Output"],
-Cell[11378, 308, 330, 10, 48, "Output"]
+Cell[6576, 162, 1382, 34, 117, "Input"],
+Cell[7961, 198, 843, 26, 45, "Output"],
+Cell[8807, 226, 585, 17, 32, "Output"],
+Cell[9395, 245, 1651, 49, 80, "Output"],
+Cell[11049, 296, 276, 8, 45, "Output"],
+Cell[11328, 306, 330, 10, 45, "Output"]
 }, Open  ]],
-Cell[11723, 321, 269, 7, 50, "Input"],
-Cell[11995, 330, 4505, 129, 306, "Input"],
-Cell[16503, 461, 274, 5, 60, "Input"],
+Cell[11673, 319, 244, 6, 50, "Input"],
+Cell[11920, 327, 4505, 129, 275, "Input"],
+Cell[16428, 458, 249, 4, 60, "Input"],
 Cell[CellGroupData[{
-Cell[16802, 470, 927, 25, 55, "Input"],
-Cell[17732, 497, 12957, 220, 222, "Output"],
-Cell[30692, 719, 19961, 334, 229, "Output"]
+Cell[16702, 466, 927, 25, 54, "Input"],
+Cell[17632, 493, 12957, 220, 225, "Output"],
+Cell[30592, 715, 19961, 334, 230, "Output"]
 }, Open  ]],
-Cell[50668, 1056, 218, 3, 32, "Input"],
-Cell[50889, 1061, 91, 1, 32, "Input"],
-Cell[50983, 1064, 240, 4, 32, "Input"],
+Cell[50568, 1052, 218, 3, 32, "Input"],
+Cell[50789, 1057, 91, 1, 32, "Input"],
+Cell[50883, 1060, 215, 3, 32, "Input"],
 Cell[CellGroupData[{
-Cell[51248, 1072, 821, 19, 77, "Input"],
-Cell[52072, 1093, 1594, 33, 246, "Output"],
-Cell[53669, 1128, 1472, 30, 252, "Output"]
+Cell[51123, 1067, 821, 19, 75, "Input"],
+Cell[51947, 1088, 1594, 33, 245, "Output"],
+Cell[53544, 1123, 1472, 30, 250, "Output"]
 }, Open  ]],
-Cell[55156, 1161, 68, 1, 32, "Input"],
-Cell[55227, 1164, 185, 3, 32, "Input"],
+Cell[55031, 1156, 68, 1, 32, "Input"],
+Cell[55102, 1159, 160, 2, 32, "Input"],
 Cell[CellGroupData[{
-Cell[55437, 1171, 770, 19, 55, "Input"],
-Cell[56210, 1192, 7159, 123, 246, "Output"],
-Cell[63372, 1317, 5681, 99, 246, "Output"]
+Cell[55287, 1165, 770, 19, 54, "Input"],
+Cell[56060, 1186, 7159, 123, 245, "Output"],
+Cell[63222, 1311, 5681, 99, 245, "Output"]
 }, Open  ]],
-Cell[69068, 1419, 70, 1, 32, "Input"],
-Cell[69141, 1422, 286, 5, 32, "Input"],
+Cell[68918, 1413, 70, 1, 32, "Input"],
+Cell[68991, 1416, 261, 4, 32, "Input"],
 Cell[CellGroupData[{
-Cell[69452, 1431, 893, 21, 55, "Input"],
-Cell[70348, 1454, 10745, 182, 232, "Output"],
-Cell[81096, 1638, 10909, 185, 226, "Output"]
+Cell[69277, 1424, 893, 21, 54, "Input"],
+Cell[70173, 1447, 10745, 182, 232, "Output"],
+Cell[80921, 1631, 10909, 185, 229, "Output"]
 }, Open  ]],
-Cell[92020, 1826, 92, 1, 32, "Input"],
-Cell[92115, 1829, 186, 3, 32, "Input"],
+Cell[91845, 1819, 92, 1, 32, "Input"],
+Cell[91940, 1822, 161, 2, 32, "Input"],
 Cell[CellGroupData[{
-Cell[92326, 1836, 895, 20, 55, "Input"],
-Cell[93224, 1858, 16449, 275, 246, "Output"],
-Cell[109676, 2135, 15715, 264, 248, "Output"]
+Cell[92126, 1828, 895, 20, 54, "Input"],
+Cell[93024, 1850, 16449, 275, 245, "Output"],
+Cell[109476, 2127, 15715, 264, 247, "Output"]
 }, Open  ]]
 }
 ]
 *)
 
-(* End of internal cache information *)

@@ -16,6 +16,7 @@ module NEQ_THERMOSTAT
   public                           :: get_thermostat_bath
 
 contains
+  
   !+-------------------------------------------------------------------+
   !PURPOSE  : Build the Bath part of the system using exclusively time
   !dependent formalism. The bath is not interacting so it is 
