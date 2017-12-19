@@ -299,10 +299,7 @@ contains
 
 
 
-
-
-
-
+  
   !+-----------------------------------------------------------------------------+!
   !PURPOSE: AUXILIARY ROUTINES:
   !  - read_header     : read the header of the seed file for the Self-energy S(tau)
