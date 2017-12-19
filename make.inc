@@ -1,11 +1,11 @@
 ##$ COMPILER: suppprted compilers are ifort, gnu >v4.7
 ##$ use mpif90 for parallel compiler
-FC=ifort
+FC=gfortran
 
 ##$ PLATFORM: supported platform are intel, gnu
 ##$ if using a parallel compiler (mpif90) check
 ##$ platform first using the cmd: $mpif90 -show
-PLAT=intel
+PLAT=gnu
 
 
 ##$ LOCATION OF THE scifor and dmft_tools DIRECTORIES

@@ -3,28 +3,27 @@ program neqDMFT
   USE SCIFOR
   USE DMFT_TOOLS
   implicit none
-  integer                               :: i,j,ik,itime,iloop,ix,iy,iz,Lk,Nx
-  logical                               :: converged
-  real(8)                               :: ts,kx,ky,time
-  character(len=16)                     :: finput
-  type(kb_contour_gf)                   :: Sbath
-  type(kb_contour_gf)                   :: Gloc
-  type(kb_contour_gf)                   :: Gwf
-  type(kb_contour_gf)                   :: Sigma
-  type(kb_contour_gf)                   :: SigmaReg
-  complex(8),dimension(:),allocatable   :: SigmaHF
+  integer                              :: i,j,ik,itime,iloop,ix,iy,iz,Lk,Nx
+  logical                              :: converged
+  real(8)                              :: ts,kx,ky,time
+  character(len=16)                    :: finput
+  type(kb_contour_gf)                  :: Sbath
+  type(kb_contour_gf)                  :: Gloc
+  type(kb_contour_gf)                  :: Gwf
+  type(kb_contour_sigma)               :: Sigma
   !
-  type(kb_contour_gf)                   :: Ker
-  type(kb_contour_gf),allocatable       :: Gk(:)
-  type(kb_contour_dgf),allocatable      :: dGk(:),dGk_old(:)
-  type(kb_contour_dgf)                  :: Gedge
-  complex(8),dimension(:),allocatable   :: Ham
+  type(kb_contour_gf)                  :: Ker
+  type(kb_contour_gf),allocatable      :: Gk(:)
+  type(kb_contour_dgf),allocatable     :: dGk(:),dGk_old(:)
+  type(kb_contour_dgf)                 :: Gedge
+  complex(8),dimension(:),allocatable  :: Ham
   !RESULTS:
-  complex(8),dimension(:,:),allocatable :: Hk
-  real(8),dimension(:,:,:),allocatable  :: Vk
-  real(8),dimension(:),allocatable      :: kxgrid,kygrid,Wt,Epsik
-  real(8),dimension(:,:,:),allocatable  :: nDens
-  real(8),dimension(:,:),allocatable    :: nk
+  complex(8),dimension(:,:),allocatable   :: Hk
+  complex(8),dimension(:,:,:),allocatable :: Epsik
+  complex(8),dimension(:,:,:),allocatable :: Vk
+  real(8),dimension(:),allocatable     :: Wt
+  real(8),dimension(:,:,:),allocatable :: nDens
+  real(8),dimension(:,:),allocatable   :: nk,kgrid
 
 
   !READ THE INPUT FILE (in vars_global):
@@ -44,23 +43,26 @@ program neqDMFT
 
   !BUILD THE LATTICE STRUCTURE (use tight_binding):
   Lk = Nx*Nx
-  allocate(Epsik(Lk),Wt(Lk))
-  allocate(Hk(Ntime,Lk),Vk(Ntime,Lk,2))
-  allocate(kxgrid(Nx),kygrid(Nx))
   write(*,*) "Using Nk_total="//txtfy(Lk)
-  kxgrid = kgrid(Nx)
-  kygrid = kgrid(Nx)
-  Epsik  = build_hk_model(hk_model,kxgrid,kygrid,[0d0])
-  Wt     = 1d0/Lk
-  call write_hk_w90("Hk2d.dat",1,1,0,1,dcmplx(Epsik,0d0),kxgrid,kygrid,[0d0])
-  call get_free_dos(Epsik,Wt)
+
+
+  call TB_set_ei([1d0,0d0],[0d0,1d0])
+  call TB_set_bk([pi2,0d0],[0d0,pi2])
+
+  allocate(Epsik(1,1,Lk))
+  allocate(Wt(Lk))
+  call TB_build_model(Epsik,hk_model,1,[Nx,Nx])
+  Wt = 1d0/Lk
+  call get_free_dos(dreal(Epsik(1,1,:)),Wt)
+
+  allocate(Kgrid(Lk,2))
+  call TB_build_kgrid([Nx,Nx],kgrid)
+
+  allocate(Hk(Ntime,Lk),Vk(Ntime,Lk,2))
   do i=1,cc_params%Ntime
      do ik=1,Lk
-        call indx2coord(ik,ix,iy,iz,[Nx,Nx,1])
-        kx=kxgrid(ix)
-        ky=kygrid(iy)
-        Hk(i,ik)   = hkt_model([kx,ky],cc_params%t(i))
-        Vk(i,ik,:) = vk_model([kx,ky],cc_params%t(i))
+        Hk(i,ik)   = hkt_model(kgrid(ik,:),cc_params%t(i))
+        Vk(i,ik,:) = vk_model(kgrid(ik,:),cc_params%t(i))
      enddo
   enddo
 
@@ -71,9 +73,7 @@ program neqDMFT
 
 
   !ALLOCATE ALL THE FUNCTIONS INVOLVED IN THE CALCULATION:
-  allocate(SigmaHF(cc_params%Ntime)) !Self-Energy function (Hartree-Fock term)
-  call allocate_kb_contour_gf(SigmaReg,cc_params) !Self-Energy function (Regular or 2nd-order term)
-  call allocate_kb_contour_gf(Sigma,cc_params) !Self-Energy function
+  call allocate_kb_contour_sigma(Sigma,cc_params) !Self-Energy function
   call allocate_kb_contour_gf(Gloc,cc_params)  !Local Green's function
   call allocate_kb_contour_gf(Gwf,cc_params)   !Local Weiss-Field function
   call allocate_kb_contour_gf(Ker,cc_params)
@@ -90,7 +90,7 @@ program neqDMFT
   !READ OR GUESS THE INITIAL WEISS FIELD G0 (t=t'=0)
   cc_params%Nt=1
   Gloc = zero
-  call neq_continue_equilibirum(Gwf,Gk,dGk,Gloc,SigmaHF,SigmaReg,Sigma,epsik,wt,cc_params)
+  call neq_continue_equilibirum(Gwf,Gk,dGk,Gloc,Sigma,Epsik(1,1,:),Wt,cc_params)
   call measure_observables(Gloc,Sigma,Gk,Hk,Wt,cc_params)
   call measure_current(Gk,Vk,Wt,cc_params)
   do ik=1,Lk
@@ -118,22 +118,22 @@ program neqDMFT
 
         !IMPURITY SOLVER: IPT.
         !GET SIGMA FROM THE WEISS FIELD
-        sigmaHF(itime) = zero
-        call neq_solve_ipt(Gwf,SigmaReg,cc_params)
-        call sum_kb_contour_gf(SigmaReg,1d0,SigmaHF,1d0,Sigma,cc_params)
+        ! sigmaHF(itime) = zero
+        call neq_solve_ipt(Gwf,Gloc,Sigma,cc_params)
+        ! call sum_kb_contour_gf(SigmaReg,1d0,SigmaHF,1d0,Sigma,cc_params)
 
         !PERFORM THE SELF_CONSISTENCY: get local GF + update Weiss-Field
         !prepare the kernel for evolution: Ker=Sigma+S_bath
-        call sum_kb_contour_gf(Sbath,1d0,Sigma,1d0,Ker,cc_params)
+        call sum_kb_contour_gf(Sbath,1d0,Sigma%reg,1d0,Ker,cc_params)
         do ik=1,Lk
            Ham = Hk(:,ik)
-           call vide_kb_contour_gf(Ham+sigmaHF,Ker,Gk(ik),dGk_old(ik),dGk(ik),cc_params)
+           call vide_kb_contour_gf(Ham+Sigma%hf,Ker,Gk(ik),dGk_old(ik),dGk(ik),cc_params)
         enddo
         call sum_kb_contour_gf(Gk(:),wt(:),Gloc,cc_params)
 
         !update the weiss field by solving the integral equation:
         ! G0 + K*G0 = Q , with K = G*\Sigma and Q = G
-        call convolute_kb_contour_gf(Gloc,SigmaReg,Ker,cc_params,dcoeff=-1.d0)
+        call convolute_kb_contour_gf(Gloc,Sigma,Ker,cc_params,dcoeff=-1.d0)
         call vie_kb_contour_gf(Gloc,Ker,Gwf,cc_params)
         !
         !CHECK CONVERGENCE
@@ -150,15 +150,16 @@ program neqDMFT
   !EVALUATE AND PRINT THE RESULTS OF THE CALCULATION
   allocate(ndens(1:Nx,1:Nx,cc_params%Ntime))
   do i=1,cc_params%Ntime
-     do ik=1,Lk
-        ix = indx2ix(ik,[Nx,Nx,1])
-        iy = indx2iy(ik,[Nx,Nx,1])
-        nDens(ix,iy,i)=nk(i,ik)
+     do ix=1,Nx
+        do iy=1,Nx
+           ik = ix + (iy-1)*Nx
+           nDens(ix,iy,i)=nk(i,ik)
+        enddo
      enddo
   enddo
-  call splot3d("3dFSVSpiVSt.nipt",kxgrid,kygrid,nDens(:,:,:))
-  call splot3d("nkVSepsikVStime.nipt",cc_params%t,epsik,nk)
-  call plot_kb_contour_gf("Sigma.nipt",Sigma,cc_params)
+  call splot3d("3dFSVSpiVSt.nipt",kgrid(:,1),kgrid(:,2),nDens(:,:,:))
+  call splot3d("nkVSepsikVStime.nipt",cc_params%t,dreal(Epsik(1,1,:)),nk)
+  call plot_kb_contour_gf("Sigma.nipt",Sigma%reg,cc_params)
   call plot_kb_contour_gf("Gloc.nipt",Gloc,cc_params)
   call plot_kb_contour_gf("G0.nipt",Gwf,cc_params)
 
@@ -169,11 +170,11 @@ program neqDMFT
 contains
 
 
-  function hk_model(kpoint) result(hk)
+  function hk_model(kpoint,N) result(hk)
     real(8),dimension(:) :: kpoint
     integer              :: N
     real(8)              :: kx,ky
-    complex(8)           :: hk
+    complex(8)              :: hk(N,N)
     kx=kpoint(1)
     ky=kpoint(2)
     Hk = -one*2d0*ts*(cos(kx)+cos(ky))
@@ -185,11 +186,12 @@ contains
     real(8)              :: time
     integer              :: ik
     real(8)              :: kx,ky
-    complex(8)           :: hk
+    complex(8)              :: hk,hk_(1,1)
     Ak = Afield(time)
     kx=kpoint(1) - Ak(1)
-    ky=kpoint(2) - Ak(2)
-    hk = hk_model([kx,ky])
+    ky=kpoint(2) - Ak(2)    
+    hk_ = hk_model([kx,ky],1)
+    hk=hk_(1,1)
   end function Hkt_Model
 
   function Vk_model(kpoint,time) result(vel)

@@ -99,8 +99,8 @@ contains
     type(kb_contour_gf)                 :: Gk
     type(kb_contour_dgf)                :: dGk
     type(kb_contour_sigma)              :: Self
-    real(8)                             :: Hk
-    real(8)                             :: Hk_hf
+    complex(8)                          :: Hk
+    complex(8)                          :: Hk_hf
     type(kb_contour_params)             :: params
     integer                             :: i,j,k,L,Lf
     complex(8),allocatable,dimension(:) :: SxG
@@ -167,7 +167,8 @@ contains
     type(kb_contour_dgf)                :: dgk(size(gk))
     type(kb_contour_gf)                 :: g
     type(kb_contour_sigma)              :: self
-    real(8)                             :: Hk(size(gk)),Wtk(size(gk))
+    complex(8)                          :: Hk(size(gk))
+    real(8)                             :: Wtk(size(gk))
     type(kb_contour_params)             :: params
     logical                             :: bool
     integer                             :: i,j,k,ik,unit,len,N,L,Lf,Lk

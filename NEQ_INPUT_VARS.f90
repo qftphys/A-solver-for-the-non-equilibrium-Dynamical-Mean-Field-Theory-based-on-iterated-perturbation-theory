@@ -3,9 +3,9 @@
 !     AUTHORS  : Adriano Amaricci
 !#####################################################################
 MODULE NEQ_INPUT_VARS
-  USE SCIFOR_VERSION
+  USE SF_VERSION
   USE SF_CONSTANTS
-  USE DMFT_PARSE_INPUT
+  USE SF_PARSE_INPUT
   implicit none
 
   !GIT VERSION
@@ -85,7 +85,8 @@ contains
     call parse_input_variable(E1         , "E1" , inputFILE , default         =0d0 , comment="Electric field strenght for the AC+DC case (tune to resonate)")
     call parse_input_variable(sigma_file , "SIGMA_FILE" , inputFILE , default    ="Sigma.restart" , comment="File with Sigma(iw) + header")
     call save_input_file(inputFILE)
-    call sf_version(revision)
+    call scifor_version()
+    call code_version(revision)
   end subroutine read_input_init
 
 

@@ -98,11 +98,11 @@ subroutine save_kb_contour_gf(G,file)
   write(unit,"(A1,3A4,3X)")"#","N","L","Lf"
   write(unit,"(1X,3I4,3X)")N,L,Lf
   close(unit)
-  call store_data(reg(file)//"_less.data.neqipt",G%less(:,:))
-  call store_data(reg(file)//"_ret.data.neqipt", G%ret(:,:))
-  call store_data(reg(file)//"_lmix.data.neqipt",G%lmix(:,0:))
-  call store_data(reg(file)//"_mats.data.neqipt",G%mats(0:))
-  call store_data(reg(file)//"_iw.data.neqipt",G%iw(:))
+  call save_array(reg(file)//"_less.data.neqipt",G%less(:,:))
+  call save_array(reg(file)//"_ret.data.neqipt", G%ret(:,:))
+  call save_array(reg(file)//"_lmix.data.neqipt",G%lmix(:,0:))
+  call save_array(reg(file)//"_mats.data.neqipt",G%mats(0:))
+  call save_array(reg(file)//"_iw.data.neqipt",G%iw(:))
 end subroutine save_kb_contour_gf
 !
 subroutine save_kb_contour_sigma(S,file)
@@ -131,9 +131,9 @@ subroutine save_kb_contour_dgf(dG,file)
   write(unit,"(A1,2A4,2X)")"#","N","L"
   write(unit,"(1X,2I4,2X)")N,L
   close(unit)
-  call store_data(reg(file)//"_less.data.neqipt",dG%less(:))
-  call store_data(reg(file)//"_ret.data.neqipt", dG%ret(:))
-  call store_data(reg(file)//"_lmix.data.neqipt",dG%lmix(0:))
+  call save_array(reg(file)//"_less.data.neqipt",dG%less(:))
+  call save_array(reg(file)//"_ret.data.neqipt", dG%ret(:))
+  call save_array(reg(file)//"_lmix.data.neqipt",dG%lmix(0:))
 end subroutine save_kb_contour_dgf
 
 
@@ -147,11 +147,11 @@ subroutine read_kb_contour_gf(G,file)
   logical              :: check
   check = inquire_kb_contour_gf(file)
   if(.not.G%status.OR..not.check)stop "contour_gf/read_kb_contour_gf: G not allocated"
-  call read_data(trim(file)//"_less.data.neqipt",G%less(:,:))
-  call read_data(trim(file)//"_ret.data.neqipt",G%ret(:,:))
-  call read_data(trim(file)//"_lmix.data.neqipt",G%lmix(:,0:))
-  call read_data(trim(file)//"_mats.data.neqipt",G%mats(0:))
-  call read_data(trim(file)//"_iw.data.neqipt",G%iw(:))
+  call read_array(trim(file)//"_less.data.neqipt",G%less(:,:))
+  call read_array(trim(file)//"_ret.data.neqipt",G%ret(:,:))
+  call read_array(trim(file)//"_lmix.data.neqipt",G%lmix(:,0:))
+  call read_array(trim(file)//"_mats.data.neqipt",G%mats(0:))
+  call read_array(trim(file)//"_iw.data.neqipt",G%iw(:))
 end subroutine read_kb_contour_gf
 !
 subroutine read_kb_contour_sigma(S,file)
@@ -162,7 +162,7 @@ subroutine read_kb_contour_sigma(S,file)
   check = inquire_kb_contour_sigma(file)
   if(.not.S%status.OR..not.check)stop "contour_gf/read_kb_contour_sigma: S not allocated"
   Len  = file_length(reg(file)//"_hfb.data.neqipt")
-  if( Len > size(S%hf) ) stop"contour_gf/read_kb_contour_sigma: length(file) > size(S%hf)"
+  if( Len > size(S%hf) ) stop "contour_gf/read_kb_contour_sigma: length(file) > size(S%hf)"
   unit = free_unit()
   open(unit,file=reg(file)//"_hfb.data.neqipt")
   do i=1,Len
@@ -178,9 +178,9 @@ subroutine read_kb_contour_dgf(dG,file)
   logical              :: check
   check = inquire_kb_contour_dgf(file)
   if(.not.dG%status.OR..not.check)stop "contour_gf/read_kb_contour_dgf: dG not allocated"
-  call read_data(trim(file)//"_less.data.neqipt",dG%less(:))
-  call read_data(trim(file)//"_ret.data.neqipt",dG%ret(:))
-  call read_data(trim(file)//"_lmix.data.neqipt",dG%lmix(0:))
+  call read_array(trim(file)//"_less.data.neqipt",dG%less(:))
+  call read_array(trim(file)//"_ret.data.neqipt",dG%ret(:))
+  call read_array(trim(file)//"_lmix.data.neqipt",dG%lmix(0:))
 end subroutine read_kb_contour_dgf
 !
 !

@@ -177,7 +177,7 @@ contains
   !+-------------------------------------------------------------------+
   subroutine measure_current(Gk,Vkt,Wtk,params)
     type(kb_contour_gf)            :: gk(:)
-    real(8),dimension(:,:,:)       :: Vkt
+    complex(8),dimension(:,:,:)    :: Vkt
     real(8),dimension(:)           :: wtk
     type(kb_contour_params)        :: params
     integer                        :: unit,itime,Lk,ik,i
