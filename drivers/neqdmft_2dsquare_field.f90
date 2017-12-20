@@ -3,75 +3,96 @@ program neqDMFT
   USE SCIFOR
   USE DMFT_TOOLS
   implicit none
-  integer                              :: i,j,ik,itime,iloop,ix,iy,iz,Lk,Nx
-  logical                              :: converged
-  real(8)                              :: ts,kx,ky,time
-  character(len=16)                    :: finput
-  type(kb_contour_gf)                  :: Sbath
-  type(kb_contour_gf)                  :: Gloc
-  type(kb_contour_gf)                  :: Gwf
-  type(kb_contour_sigma)               :: Sigma
+  integer                                     :: i,j,ik,itime,iloop,ix,iy,iz,Lk,Nx
+  logical                                     :: converged
+  real(8)                                     :: ts,kx,ky,time,dens
+  character(len=16)                           :: finput
+  type(kb_contour_gf)                         :: Sbath
+  type(kb_contour_gf)                         :: Gloc
+  type(kb_contour_gf)                         :: Gwf
+  type(kb_contour_sigma)                      :: Sigma
   !
-  type(kb_contour_gf)                  :: Ker
-  type(kb_contour_gf),allocatable      :: Gk(:)
-  type(kb_contour_dgf),allocatable     :: dGk(:),dGk_old(:)
-  type(kb_contour_dgf)                 :: Gedge
-  complex(8),dimension(:),allocatable  :: Ham
-  !RESULTS:
-  complex(8),dimension(:,:),allocatable   :: Hk
-  complex(8),dimension(:,:,:),allocatable :: Epsik
-  complex(8),dimension(:,:,:),allocatable :: Vk
-  real(8),dimension(:),allocatable     :: Wt
-  real(8),dimension(:,:,:),allocatable :: nDens
-  real(8),dimension(:,:),allocatable   :: nk,kgrid
-
+  type(kb_contour_gf)                         :: Ker
+  type(kb_contour_gf),allocatable             :: Gk(:)
+  type(kb_contour_dgf),allocatable            :: dGk(:),dGk_old(:)
+  type(kb_contour_dgf)                        :: Gedge
+  complex(8),dimension(:),allocatable         :: Ham
+  !
+  complex(8),dimension(:,:,:,:,:),allocatable :: Gmats
+  complex(8),dimension(:,:,:,:,:),allocatable :: Gkmats
+  complex(8),dimension(:,:,:,:,:),allocatable :: Smats
+  complex(8),dimension(:,:,:,:,:),allocatable :: Weiss,Weiss_prev
+  !
+  complex(8),dimension(:,:),allocatable       :: Hk
+  complex(8),dimension(:,:,:),allocatable     :: Epsik
+  complex(8),dimension(:,:,:),allocatable     :: Vk
+  real(8),dimension(:),allocatable            :: Wt,kxgrid,kygrid
+  real(8),dimension(:,:,:),allocatable        :: nDens
+  real(8),dimension(:,:),allocatable          :: nk,kgrid
+  logical                                     :: solve_neq
 
   !READ THE INPUT FILE (in vars_global):
   call parse_cmd_variable(finput,"FINPUT",default='inputNEQ.conf')
   call parse_input_variable(ts,"ts",finput,default=1d0,comment="hopping")
   call parse_input_variable(Nx,"Nx",finput,default=21,comment="Number of k-points")
+  call parse_input_variable(solve_neq,"SOLVE_NEQ",finput,default=.true.,comment="Flag to solve the non-equilibrium dynamics")
   call read_input_init(trim(finput))
+
+  !Add DMFT CTRL Variables:
+  call add_ctrl_var(1,"norb")
+  call add_ctrl_var(1,"nspin")
+  call add_ctrl_var(beta,"beta")
+  call add_ctrl_var(xmu,"xmu")
 
 
   !BUILD TIME GRIDS AND NEQ-PARAMETERS:
-  call allocate_kb_contour_params(cc_params,Ntime,Ntau,Niw)
-  call setup_kb_contour_params(cc_params,dt,beta)
-
-  !SET THE ELECTRIC FIELD (in electric_field):
-  call set_efield_vector(cc_params%t)
+  call allocate_kb_contour_params(cc_params)
+  call setup_kb_contour_params(cc_params)
 
 
   !BUILD THE LATTICE STRUCTURE (use tight_binding):
   Lk = Nx*Nx
   write(*,*) "Using Nk_total="//txtfy(Lk)
-
-
-  call TB_set_ei([1d0,0d0],[0d0,1d0])
+  !
   call TB_set_bk([pi2,0d0],[0d0,pi2])
-
+  !
   allocate(Epsik(1,1,Lk))
   allocate(Wt(Lk))
+
+
   call TB_build_model(Epsik,hk_model,1,[Nx,Nx])
   Wt = 1d0/Lk
   call get_free_dos(dreal(Epsik(1,1,:)),Wt)
-
+  !
   allocate(Kgrid(Lk,2))
   call TB_build_kgrid([Nx,Nx],kgrid)
+  !
 
-  allocate(Hk(Ntime,Lk),Vk(Ntime,Lk,2))
-  do i=1,cc_params%Ntime
-     do ik=1,Lk
-        Hk(i,ik)   = hkt_model(kgrid(ik,:),cc_params%t(i))
-        Vk(i,ik,:) = vk_model(kgrid(ik,:),cc_params%t(i))
-     enddo
-  enddo
+  !SOLVE THE EQUILIBRIUM PROBLEM:
+  allocate(Gmats(1,1,1,1,Niw));Gmats=zero
+  allocate(Smats(1,1,1,1,Niw));Smats=zero
+  allocate(Weiss(1,1,1,1,Niw));Weiss=zero
+  allocate(Weiss_prev(1,1,1,1,Niw));Weiss_prev=zero
+  allocate(Gkmats(1,1,1,1,Niw));Gkmats=zero
+  iloop=0;converged=.false.
+  do while(.not.converged.AND.iloop<nloop)
+     iloop=iloop+1
+     write(*,"(A,I2,A1)")"dmft loop=",iloop," "
+     call dmft_gloc_matsubara(Epsik,Wt,Gmats,Smats)
+     call dmft_print_gf_matsubara(Gmats,"Gloc",iprint=1)
+     Weiss_prev=Weiss
+     call dmft_weiss(Gmats,Smats,Weiss,zeros(1,1,1,1))
+     if(iloop>1)Weiss = 0.5d0*Weiss + 0.5d0*Weiss_prev
+     call ipt_solve_matsubara(Weiss(1,1,1,1,:),Smats(1,1,1,1,:))
+     dens    = ipt_measure_dens_matsubara(Gmats(1,1,1,1,:))
+     write(*,"(3F15.9,1x)")dens
+     converged=check_convergence(Weiss(1,1,1,1,:),dmft_error,nsuccess,nloop)
+  end do
+  if(.not.solve_neq)stop "Ending Equilibrium calculation. STOP"
 
 
-  !SET THE THERMOSTAT FUNCTION (in neq_thermostat):
-  call allocate_kb_contour_gf(Sbath,cc_params)
-  call get_thermostat_bath(Sbath,cc_params)
 
-
+  !SETUP THE INITIAL CONDITIONS (t=t`=0)
   !ALLOCATE ALL THE FUNCTIONS INVOLVED IN THE CALCULATION:
   call allocate_kb_contour_sigma(Sigma,cc_params) !Self-Energy function
   call allocate_kb_contour_gf(Gloc,cc_params)  !Local Green's function
@@ -83,23 +104,52 @@ program neqDMFT
      call allocate_kb_contour_dgf(dGk(ik),cc_params)
      call allocate_kb_contour_dgf(dGk_old(ik),cc_params)
   end do
-  allocate(ham(cc_params%Ntime))
-  allocate(nk(cc_params%Ntime,Lk))
-
-
-  !READ OR GUESS THE INITIAL WEISS FIELD G0 (t=t'=0)
+  !
   cc_params%Nt=1
   Gloc = zero
-  call neq_continue_equilibirum(Gwf,Gk,dGk,Gloc,Sigma,Epsik(1,1,:),Wt,cc_params)
+  call neq_setup_contour(Gmats(1,1,1,1,:),Gloc,cc_params)
+  call neq_setup_contour(zero,Smats(1,1,1,1,:),Sigma,cc_params)
+  call neq_setup_contour(Weiss(1,1,1,1,:),Gwf,cc_params)
+  do ik=1,Lk
+     call dmft_gk_matsubara(Epsik(:,:,ik),Wt(ik),Gkmats,Smats)
+     call neq_setup_contour(Gkmats(1,1,1,1,:),Gk(ik),cc_params)
+     call neq_setup_contour(Gk(ik),dGk(ik),Sigma,Epsik(1,1,ik),cc_params)
+  enddo
+
+
+
+  !SET THE ELECTRIC FIELD (in electric_field):
+  call set_efield_vector(cc_params%t)
+
+
+  !SETUP THE TIME-DEPENDENT HAMILTONIAN \& VELOCITY FIELD
+  allocate(Hk(Ntime,Lk),Vk(Ntime,Lk,2))
+  do i=1,cc_params%Ntime
+     do ik=1,Lk
+        Hk(i,ik)   = hkt_model(kgrid(ik,:),cc_params%t(i))
+        Vk(i,ik,:) = vk_model(kgrid(ik,:),cc_params%t(i))
+     enddo
+  enddo
+
+
+  !MEASUE OBSERVABLES AT t=t`=0
   call measure_observables(Gloc,Sigma,Gk,Hk,Wt,cc_params)
   call measure_current(Gk,Vk,Wt,cc_params)
+  !
+  allocate(nk(cc_params%Ntime,Lk))
   do ik=1,Lk
      nk(1,ik)=dimag(Gk(ik)%less(1,1))
   enddo
 
 
+  !SET THE THERMOSTAT FUNCTION (in neq_thermostat):
+  call allocate_kb_contour_gf(Sbath,cc_params)
+  call get_thermostat_bath(Sbath,cc_params)
+
+
   !START THE TIME_STEP LOOP  1<t<=Nt
   !AT EACH TIME_STEP PERFORM A FULL DMFT CALCULATION:
+  allocate(ham(cc_params%Ntime))
   do itime=2,cc_params%Ntime
      print*,""
      print*,"time step=",itime
@@ -126,8 +176,8 @@ program neqDMFT
         !prepare the kernel for evolution: Ker=Sigma+S_bath
         call sum_kb_contour_gf(Sbath,1d0,Sigma%reg,1d0,Ker,cc_params)
         do ik=1,Lk
-           Ham = Hk(:,ik)
-           call vide_kb_contour_gf(Ham+Sigma%hf,Ker,Gk(ik),dGk_old(ik),dGk(ik),cc_params)
+           ! Ham = Hk(:,ik)
+           call vide_kb_contour_gf(Hk(:,ik)+Sigma%hf,Ker,Gk(ik),dGk_old(ik),dGk(ik),cc_params)
         enddo
         call sum_kb_contour_gf(Gk(:),wt(:),Gloc,cc_params)
 
@@ -148,7 +198,13 @@ program neqDMFT
 
 
   !EVALUATE AND PRINT THE RESULTS OF THE CALCULATION
+  call plot_kb_contour_gf("Sigma",Sigma%reg,cc_params)
+  call plot_kb_contour_gf("Gloc",Gloc,cc_params)
+  call plot_kb_contour_gf("G0",Gwf,cc_params)
+  !
+
   allocate(ndens(1:Nx,1:Nx,cc_params%Ntime))
+  !
   do i=1,cc_params%Ntime
      do ix=1,Nx
         do iy=1,Nx
@@ -157,11 +213,8 @@ program neqDMFT
         enddo
      enddo
   enddo
-  call splot3d("3dFSVSpiVSt.nipt",kgrid(:,1),kgrid(:,2),nDens(:,:,:))
-  call splot3d("nkVSepsikVStime.nipt",cc_params%t,dreal(Epsik(1,1,:)),nk)
-  call plot_kb_contour_gf("Sigma.nipt",Sigma%reg,cc_params)
-  call plot_kb_contour_gf("Gloc.nipt",Gloc,cc_params)
-  call plot_kb_contour_gf("G0.nipt",Gwf,cc_params)
+  call splot3d("3dFSVSpiVSt.neqipt",linspace(0d0,pi2,Nx,iend=.false.),linspace(0d0,pi2,Nx,iend=.false.),nDens(:,:,:))
+  call splot3d("nkVSepsikVStime.neqipt",cc_params%t,dreal(Epsik(1,1,:)),nk)
 
   print*,"BRAVO"
 
@@ -186,7 +239,7 @@ contains
     real(8)              :: time
     integer              :: ik
     real(8)              :: kx,ky
-    complex(8)              :: hk,hk_(1,1)
+    complex(8)           :: hk,hk_(1,1)
     Ak = Afield(time)
     kx=kpoint(1) - Ak(1)
     ky=kpoint(2) - Ak(2)    

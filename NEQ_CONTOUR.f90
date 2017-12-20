@@ -1,4 +1,5 @@
 MODULE NEQ_CONTOUR
+  USE NEQ_INPUT_VARS
   USE SF_CONSTANTS, only: one,xi,zero,pi
   USE SF_ARRAYS, only: linspace,arange
   USE SF_IOTOOLS, only: reg,free_unit
@@ -42,18 +43,18 @@ contains
 
 
   !======= ALLOCATE ======= 
-  subroutine allocate_kb_contour_params(params,Ntime,Ntau,Niw)
+  subroutine allocate_kb_contour_params(params,Ntime_,Ntau_,Niw_)
     type(kb_contour_params) :: params
-    integer,intent(in)      :: Ntime,Ntau,Niw
+    integer,optional :: Ntime_,Ntau_,Niw_
     if(allocated(params%t))deallocate(params%t)
     if(allocated(params%tau))deallocate(params%tau)
     if(allocated(params%wm))deallocate(params%wm)
-    params%Ntime= Ntime
-    params%Ntau = Ntau
-    params%Niw  = Niw
-    params%Nt   = Ntime         !<== set the actual time_step to max_time
-    allocate(params%t(Ntime))
-    allocate(params%tau(0:Ntau))
+    params%Ntime= Ntime;if(present(Ntime_))params%Ntime= Ntime_
+    params%Ntau = Ntau ;if(present(Ntau_))params%Ntau = Ntau_
+    params%Niw  = Niw  ;if(present(Niw_))params%Niw  = Niw_
+    params%Nt   = params%Ntime         !<== set the actual time_step to max_time
+    allocate(params%t(params%Ntime))
+    allocate(params%tau(0:params%Ntau))
     allocate(params%wm(params%Niw))
     params%status=.true.
   end subroutine allocate_kb_contour_params
@@ -76,9 +77,8 @@ contains
 
 
   !======= BUILD ======= 
-  subroutine setup_kb_contour_params(params,dt,beta)
+  subroutine setup_kb_contour_params(params)
     type(kb_contour_params) :: params
-    real(8),intent(in)      :: dt,beta
     integer                 :: Ntime,Ntau,Niw
     real(8)                 :: tmax_,dtau_,dt_
     if(.not.params%status)stop "neq_contour/set_kb_contour_params: Contour not allocated"
